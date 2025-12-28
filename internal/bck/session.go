@@ -45,7 +45,7 @@ func (s *session) Logout() error {
 func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 	s.from = from
 	s.ctx = context.WithValue(context.Background(), "guid", uuid.NewString())
-	slog.InfoContext(s.ctx, "mail", s.from)
+	slog.InfoContext(s.ctx, "mail from", slog.String("mail", s.from))
 
 	return nil
 }
