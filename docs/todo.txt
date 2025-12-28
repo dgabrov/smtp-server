@@ -1,0 +1,4 @@
+- configure slog for files
+- configure slog for context
+- verify dmarc
+- verify spf
