@@ -1,7 +1,9 @@
 - configure slog for files
-- configure slog for context
+done - configure slog for context
 - verify dmarc
 - verify spf
 done - downgrade user and group after listening to the ports
 done - externalize all config data
 - try to deploy
+done - persistence
+- test persistence with client
