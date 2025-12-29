@@ -1,50 +1,221 @@
 package srv
 
-import "database/sql"
+import (
+	"context"
+	"crypto/sha512"
+	"database/sql"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+
+	"github.com/google/uuid"
+)
 
 type Servr interface {
-	Authenticate(username string, password string) error
-	GetLoginAndDomain(email string) (string, string, error)
-	IsLocalDomain(domain string) (bool, error)
-	CheckLocalUserAndDomain(login string, domain string) error
-	DeliverLocally(to string, body []byte) error
-	DeliverQueue(from string, to string, bytes []byte) error
+	Authenticate(context context.Context, username string, password string) error
+	GetLoginAndDomain(context context.Context, email string) (string, string, error)
+	IsLocalDomain(context context.Context, domain string) (bool, error)
+	CheckLocalUserAndDomain(context context.Context, login string, domain string) error
+	DeliverLocally(context context.Context, to string, body []byte) error
+	DeliverQueue(context context.Context, from string, to string, bytes []byte) error
 }
 
 type server struct {
 	db *sql.DB
 }
 
-func (s *server) DeliverLocally(to string, body []byte) error {
-	//TODO implement me
-	panic("implement me")
+func (s *server) DeliverLocally(context context.Context, to string, body []byte) error {
+	tx := getTx(context, s.db)
+	defer tx.Rollback()
+
+	login, domain, err := getLoginAndDomain(to)
+	if err != nil {
+		return err
+	}
+
+	userID, err := getUserID(context, tx, login, domain)
+	if len(userID) == 0 {
+		return errors.New("user not found")
+	}
+
+	mailboxID, err := getMailboxID(context, tx, userID)
+	if err != nil {
+		return err
+	}
+
+	if len(mailboxID) == 0 {
+		return errors.New("mailbox not found")
+	}
+
+	messageID := uuid.NewString()
+
+	qr := "insert into message (message_id, mailbox_id, body) values (?, ?, ?)"
+	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-func (s *server) DeliverQueue(from string, to string, bytes []byte) error {
-	//TODO implement me
-	panic("implement me")
+func (s *server) DeliverQueue(context context.Context, from string, to string, bytes []byte) error {
+	tx := getTx(context, s.db)
+	defer tx.Rollback()
+
+	qr := "insert into queue (queue_id, from_addr, to_addr, body) values (?, ?, ?, ?)"
+	id := uuid.NewString()
+
+	_, err := tx.Exec(qr, id, from, to, bytes)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-func (s *server) CheckLocalUserAndDomain(login string, domain string) error {
-	//TODO implement me
-	panic("implement me")
+func (s *server) CheckLocalUserAndDomain(context context.Context, login string, domain string) error {
+	tx := getTx(context, s.db)
+	defer tx.Rollback()
+
+	userID, err := getUserID(context, tx, login, domain)
+	if err != nil {
+		return err
+	}
+
+	if len(userID) == 0 {
+		return errors.New("user not found")
+	}
+
+	return tx.Commit()
 }
 
-func (s *server) IsLocalDomain(domain string) (bool, error) {
-	//TODO implement me
-	panic("implement me")
+func getUserID(ctx context.Context, tx *sql.Tx, login string, domain string) (string, error) {
+	qr := "select mu.user_id from mailbox_user mu, domain d where mu.domain_id = d.domain_id and d.name = ? and mu.login = ?"
+	rs, err := tx.QueryContext(ctx, qr, strings.ToLower(domain), strings.ToLower(login))
+	if err != nil {
+		return "", err
+	}
+	defer rs.Close()
+
+	userID := ""
+
+	if rs.Next() {
+		err = rs.Scan(&userID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return userID, nil
 }
 
-func (s *server) GetLoginAndDomain(email string) (string, string, error) {
-	//TODO implement me
-	panic("implement me")
+func (s *server) IsLocalDomain(context context.Context, domain string) (bool, error) {
+	tx := getTx(context, s.db)
+	defer tx.Rollback()
+	res := false
+
+	qr := "select 1 from domain where name = ?"
+	rs, err := tx.QueryContext(context, qr, strings.ToLower(domain))
+	if err != nil {
+		return res, err
+	}
+	defer rs.Close()
+
+	if rs.Next() {
+		res = true
+	}
+
+	err = tx.Commit()
+
+	return res, err
 }
 
-func (s *server) Authenticate(username string, password string) error {
-	//TODO implement me
-	panic("implement me")
+func (s *server) GetLoginAndDomain(context context.Context, email string) (string, string, error) {
+	return getLoginAndDomain(email)
+}
+
+func (s *server) Authenticate(context context.Context, username string, password string) error {
+	hashed := hashPassword(password)
+	tx := getTx(context, s.db)
+	defer tx.Rollback()
+
+	login, domain, err := getLoginAndDomain(username)
+	if err != nil {
+		return err
+	}
+
+	qr := "select mu.password from mailbox_user mu, domain d where mu.domain_id = d.domain_id and d.name = ? and mu.login = ?"
+	var pass string
+
+	rs, err := tx.QueryContext(context, qr, strings.ToLower(domain), strings.ToLower(login))
+	if err != nil {
+		return err
+	}
+	defer rs.Close()
+
+	if rs.Next() {
+		err = rs.Scan(&pass)
+		if err != nil {
+			return err
+		}
+
+		if pass != hashed {
+			return errors.New("invalid credentials")
+		}
+	} else {
+		return errors.New("user not found")
+	}
+
+	return tx.Commit()
 }
 
 func NewServer(db *sql.DB) Servr {
 	return &server{db: db}
+}
+
+func getLoginAndDomain(email string) (string, string, error) {
+	em := strings.ToLower(email)
+	items := strings.Split(em, "@")
+	if len(items) != 2 {
+		return "", "", errors.New("invalid email")
+	}
+
+	return items[0], items[1], nil
+}
+
+func getMailboxID(ctx context.Context, tx *sql.Tx, userID string) (string, error) {
+	qr := "select mailbox_id from mailbox where name = 'INBOX' && user_id = ?"
+	rs, err := tx.QueryContext(ctx, qr, userID)
+	if err != nil {
+		return "", err
+	}
+
+	defer rs.Close()
+
+	mailboxID := ""
+
+	if rs.Next() {
+		err = rs.Scan(&mailboxID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return mailboxID, nil
+}
+
+func hashPassword(password string) string {
+	hash := sha512.Sum512([]byte(password))
+
+	return fmt.Sprintf("%x", hash) // %x automatically converts bytes to hex
+}
+
+func getTx(ctx context.Context, db *sql.DB) *sql.Tx {
+	tx, err := db.Begin()
+	if err != nil {
+		slog.ErrorContext(ctx, "cannot secure transaction")
+	}
+
+	return tx
 }

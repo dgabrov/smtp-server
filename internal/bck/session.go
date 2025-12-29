@@ -34,7 +34,7 @@ func (s *session) Auth(mech string) (sasl.Server, error) {
 	return sasl.NewPlainServer(
 		func(identity, username, password string) error {
 			s.login = username
-			err := s.server.Authenticate(username, password)
+			err := s.server.Authenticate(s.ctx, username, password)
 			if err != nil {
 				slog.InfoContext(s.ctx, fmt.Sprintf("INVALID authentication: %s", username))
 				return err
@@ -76,17 +76,17 @@ func (s *session) Rcpt(to string, opts *smtp.RcptOptions) error {
 	slog.InfoContext(s.ctx, fmt.Sprintf("to: %s", s.to))
 
 	// get usr and domain
-	usr, domain, err := s.server.GetLoginAndDomain(to)
+	usr, domain, err := s.server.GetLoginAndDomain(s.ctx, to)
 	slog.InfoContext(s.ctx, fmt.Sprintf("usr: %s, domain: %s", usr, domain))
 	if err != nil {
 		return err
 	}
 
-	local, err := s.server.IsLocalDomain(domain)
+	local, err := s.server.IsLocalDomain(s.ctx, domain)
 	slog.InfoContext(s.ctx, fmt.Sprintf("local: %t", local))
 
 	if local {
-		err = s.server.CheckLocalUserAndDomain(usr, domain)
+		err = s.server.CheckLocalUserAndDomain(s.ctx, usr, domain)
 		if err != nil {
 			return err
 		}
@@ -119,9 +119,9 @@ func (s *session) Data(r io.Reader) error {
 	}
 
 	if s.local {
-		err = s.server.DeliverLocally(s.to, bytes)
+		err = s.server.DeliverLocally(s.ctx, s.to, bytes)
 	} else {
-		err = s.server.DeliverQueue(s.from, s.to, bytes)
+		err = s.server.DeliverQueue(s.ctx, s.from, s.to, bytes)
 	}
 
 	return err

@@ -40,3 +40,12 @@ create table message
         foreign key (mailbox_id) references mailbox (mailbox_id)
 );
 
+create table queue
+(
+    queue_id  varchar(64)  not null
+        primary key,
+    from_addr varchar(255) not null,
+    to_addr   varchar(255) not null,
+    body      longtext     null
+);
+
