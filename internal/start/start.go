@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dgb9/smtp-server/internal/srv"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/dgb9/smtp-server/internal/bck"
@@ -54,7 +55,8 @@ func getDatabaseConnectionPool(machine string, port int, login string, password 
 func proceedMainPort(config data.ConfigData, db *sql.DB) error {
 	// 1. Setup Backend (The logic for auth and mail handling)
 	// You must implement the 'Backend' and 'Session' interfaces
-	be := bck.NewBackend()
+	server := srv.NewServer(db)
+	be := bck.NewBackend(server)
 
 	// 2. Initialize the Server
 	s := smtp.NewServer(be)

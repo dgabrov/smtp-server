@@ -7,15 +7,17 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/google/uuid"
 )
 
 type session struct {
-	from string
-	to   string
-	ctx  context.Context
+	from   string
+	to     string
+	ctx    context.Context
+	server srv.Servr
 }
 
 func (s *session) AuthMechanisms() []string {
