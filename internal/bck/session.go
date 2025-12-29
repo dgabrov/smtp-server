@@ -3,6 +3,7 @@ package bck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -34,25 +35,29 @@ func (s *session) Auth(mech string) (sasl.Server, error) {
 }
 
 func (s *session) Reset() {
-	slog.Info("reset")
+	slog.InfoContext(s.ctx, "reset")
+
+	s.from = ""
+	s.to = ""
 }
 
 func (s *session) Logout() error {
-	slog.Info("logout")
+	slog.InfoContext(s.ctx, "logout")
+
 	return nil
 }
 
 func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 	s.from = from
-	s.ctx = context.WithValue(context.Background(), "guid", uuid.NewString())
-	slog.InfoContext(s.ctx, "mail from", slog.String("mail", s.from))
+	s.ctx = context.WithValue(context.Background(), "uuid", uuid.NewString())
+	slog.InfoContext(s.ctx, fmt.Sprintf("mail: %s", s.from))
 
 	return nil
 }
 
 func (s *session) Rcpt(to string, opts *smtp.RcptOptions) error {
 	s.to = to
-	slog.InfoContext(s.ctx, "to", s.to)
+	slog.InfoContext(s.ctx, fmt.Sprintf("to: %s", s.to))
 
 	return nil
 }

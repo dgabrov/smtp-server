@@ -2,14 +2,56 @@ package start
 
 import (
 	"crypto/tls"
-	"log"
+	"database/sql"
+	"fmt"
+	"log/slog"
+	"net"
+	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
+
 	"github.com/dgb9/smtp-server/internal/bck"
+	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-smtp"
 )
 
 func Start() error {
+
+	configureLogger()
+	config, err := data.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	dbConfig := config.Db
+	db, err := getDatabaseConnectionPool(dbConfig.Machine, dbConfig.Port, dbConfig.Login, dbConfig.Password, dbConfig.Database)
+	if err != nil {
+		return err
+	}
+
+	return proceedMainPort(config, db)
+}
+
+func getDatabaseConnectionPool(machine string, port int, login string, password string, database string) (*sql.DB, error) {
+	url := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", login, password, machine, port, database)
+	db, err := sql.Open("mysql", url)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func proceedMainPort(config data.ConfigData, db *sql.DB) error {
 	// 1. Setup Backend (The logic for auth and mail handling)
 	// You must implement the 'Backend' and 'Session' interfaces
 	be := bck.NewBackend()
@@ -19,16 +61,15 @@ func Start() error {
 	defer s.Close()
 
 	// Hardcoded Machine and Port
-	s.Addr = "127.0.0.1:8225"
-	s.Domain = "localhost"
-	s.ReadTimeout = 10 * time.Second
-	s.WriteTimeout = 10 * time.Second
-	s.MaxMessageBytes = 1024 * 1024 // 1MB limit
+	s.Domain = config.Domain
+	s.ReadTimeout = time.Duration(config.ReadTimeoutSecond) * time.Second
+	s.WriteTimeout = time.Duration(config.WriteTimeoutSecond) * time.Second
+	s.MaxMessageBytes = config.MaxMessageBytes
 
 	// 3. Mandatory TLS Configuration
 	cert, err := tls.LoadX509KeyPair(
-		"/home/daniel/IdeaProjects/smtp-server/docs/cert.pem",
-		"/home/daniel/IdeaProjects/smtp-server/docs/key.pem",
+		config.Certificates.Public,
+		config.Certificates.Private,
 	)
 
 	if err != nil {
@@ -43,10 +84,43 @@ func Start() error {
 
 	// 4. Force TLS for Authentication
 	// This prevents the server from accepting AUTH commands over plain text
-	s.AllowInsecureAuth = false
+	s.AllowInsecureAuth = config.AllowInsecureAuth
 
-	log.Printf("Starting SMTP Server on %s", s.Addr)
-	log.Println("STARTTLS is mandatory for authentication")
+	address := config.ListenAddress
+	slog.Info(fmt.Sprintf("Starting SMTP Server on %s", address))
 
-	return s.ListenAndServe()
+	l, err := net.Listen("tcp", address)
+	if err != nil {
+		return err
+	}
+	defer l.Close()
+
+	downgrade := config.Downgrade
+
+	if downgrade.Downgrade {
+		uid := downgrade.Uid
+		gid := downgrade.Gid
+
+		slog.Info("downgrading credentials", slog.Int("group", gid), slog.Int("user", uid))
+
+		// first downgrade group
+		err = syscall.Setresgid(gid, gid, gid)
+		if err != nil {
+			return err
+		}
+		slog.Info("group successfully downgraded")
+
+		// then downgrade the user
+		err = syscall.Setresuid(uid, uid, uid)
+		if err != nil {
+			return err
+		}
+		slog.Info("user successfully downgraded")
+
+	} else {
+		slog.Info("will not downgrade credentials, as per config")
+	}
+
+	return s.Serve(l)
+
 }

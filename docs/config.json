@@ -1,0 +1,24 @@
+{
+  "domain": "localhost",
+  "listenAddress": "0.0.0.0:8225",
+  "readTimeoutSecond": 10,
+  "writeTimeoutSecond": 10,
+  "maxMessageBytes": 104857600,
+  "allowInsecureAuth": false,
+  "certificates": {
+    "public": "/home/daniel/IdeaProjects/smtp-server/docs/cert.pem",
+    "private": "/home/daniel/IdeaProjects/smtp-server/docs/key.pem"
+  },
+  "downgrade": {
+    "downgrade": false,
+    "gid": 10,
+    "uid": 12
+  },
+  "db": {
+    "machine": "localhost",
+    "port": 3306,
+    "login": "smtp",
+    "password": "smtp",
+    "database": "smtp"
+  }
+}

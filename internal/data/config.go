@@ -1,0 +1,73 @@
+package data
+
+import (
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+)
+
+type ConfigData struct {
+	Domain             string
+	ListenAddress      string
+	ReadTimeoutSecond  int
+	WriteTimeoutSecond int
+	MaxMessageBytes    int64
+	AllowInsecureAuth  bool
+	Certificates       struct {
+		Public  string
+		Private string
+	}
+	Downgrade struct {
+		Downgrade bool
+		Gid       int
+		Uid       int
+	}
+	Db struct {
+		Machine  string
+		Port     int
+		Login    string
+		Password string
+		Database string
+	}
+}
+
+func LoadConfig() (ConfigData, error) {
+	slog.Info("loading config data... ")
+	configFileName := os.Getenv("CONFIG_FILE")
+	bytes, err := os.ReadFile(configFileName)
+	if err != nil {
+		return ConfigData{}, err
+	}
+
+	var config ConfigData
+	err = json.Unmarshal(bytes, &config)
+	if err != nil {
+		return ConfigData{}, err
+	}
+
+	slog.Info("config data successfully loaded")
+
+	logConfig(config)
+
+	return config, nil
+}
+
+func logConfig(config ConfigData) {
+	slog.Info(fmt.Sprintf("domain: %s", config.Domain))
+	slog.Info(fmt.Sprintf("listenAddress: %s", config.ListenAddress))
+	slog.Info(fmt.Sprintf("readTimeoutSecond: %d", config.ReadTimeoutSecond))
+	slog.Info(fmt.Sprintf("writeTimeoutSecond: %d", config.WriteTimeoutSecond))
+	slog.Info(fmt.Sprintf("maxMessageBytes: %d", config.MaxMessageBytes))
+	slog.Info(fmt.Sprintf("allowInsecureAuth: %v", config.AllowInsecureAuth))
+	slog.Info(fmt.Sprintf("public key: %s", config.Certificates.Public))
+	slog.Info(fmt.Sprintf("private key: %s", config.Certificates.Private))
+	slog.Info(fmt.Sprintf("downgrade: %v", config.Downgrade.Downgrade))
+	slog.Info(fmt.Sprintf("downgrade group: %d", config.Downgrade.Gid))
+	slog.Info(fmt.Sprintf("downgrade user: %d", config.Downgrade.Uid))
+	slog.Info(fmt.Sprintf("db machine: %s", config.Db.Machine))
+	slog.Info(fmt.Sprintf("db port: %d", config.Db.Port))
+	slog.Info(fmt.Sprintf("db login: %s", config.Db.Login))
+	slog.Info(fmt.Sprintf("db password length: %d", len(config.Db.Password)))
+	slog.Info(fmt.Sprintf("db database: %s", config.Db.Database))
+}
