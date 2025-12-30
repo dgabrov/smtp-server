@@ -1,8 +1,10 @@
 create table domain
 (
-    domain_id varchar(64)  not null
+    domain_id      varchar(64)              not null
         primary key,
-    name      varchar(255) not null,
+    name           varchar(255)             not null,
+    catchall_ind   varchar(1)   default 'N' not null,
+    catchall_login varchar(255) default ''  not null,
     constraint ix_domain_name
         unique (name)
 );
