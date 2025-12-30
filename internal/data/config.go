@@ -18,11 +18,6 @@ type ConfigData struct {
 		Public  string
 		Private string
 	}
-	Downgrade struct {
-		Downgrade bool
-		Gid       int
-		Uid       int
-	}
 	Db struct {
 		Machine  string
 		Port     int
@@ -67,9 +62,6 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("allowInsecureAuth: %v", config.AllowInsecureAuth))
 	slog.Info(fmt.Sprintf("public key: %s", config.Certificates.Public))
 	slog.Info(fmt.Sprintf("private key: %s", config.Certificates.Private))
-	slog.Info(fmt.Sprintf("downgrade: %v", config.Downgrade.Downgrade))
-	slog.Info(fmt.Sprintf("downgrade group: %d", config.Downgrade.Gid))
-	slog.Info(fmt.Sprintf("downgrade user: %d", config.Downgrade.Uid))
 	slog.Info(fmt.Sprintf("db machine: %s", config.Db.Machine))
 	slog.Info(fmt.Sprintf("db port: %d", config.Db.Port))
 	slog.Info(fmt.Sprintf("db login: %s", config.Db.Login))

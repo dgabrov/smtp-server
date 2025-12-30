@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"syscall"
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/srv"
@@ -99,32 +98,6 @@ func proceedMainPort(config data.ConfigData, db *sql.DB) error {
 		return err
 	}
 	defer l.Close()
-
-	downgrade := config.Downgrade
-
-	if downgrade.Downgrade {
-		uid := downgrade.Uid
-		gid := downgrade.Gid
-
-		slog.Info("downgrading credentials", slog.Int("group", gid), slog.Int("user", uid))
-
-		// first downgrade group
-		err = syscall.Setresgid(gid, gid, gid)
-		if err != nil {
-			return err
-		}
-		slog.Info("group successfully downgraded")
-
-		// then downgrade the user
-		err = syscall.Setresuid(uid, uid, uid)
-		if err != nil {
-			return err
-		}
-		slog.Info("user successfully downgraded")
-
-	} else {
-		slog.Info("will not downgrade credentials, as per config")
-	}
 
 	return s.Serve(l)
 
