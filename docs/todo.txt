@@ -33,7 +33,7 @@ insert into mailbox_user (user_id, domain_id, login, password) values ('office',
 insert into mailbox (mailbox_id, user_id, name) values ('1', 'dgabrov', 'INBOX');
 insert into mailbox (mailbox_id, user_id, name) values ('2', 'office', 'INBOX');
 
-docker run -v smtp_config:/config -v smtp_logs:/logs -e CONFIG_FILE=/config/config.json -p 25:8225 -d 798
+docker run -v smtp_config:/config -v smtp_logs:/logs -e CONFIG_FILE=/config/config.json -p 25:8225 -d 169533462518.dkr.ecr.us-east-2.amazonaws.com/smtp-server:1.0.5
 for login on the docker you use
 
 aws ecr get-login-password --region us-east-2 --profile docker | docker login --username AWS --password-stdin 169533462518.dkr.ecr.us-east-2.amazonaws.com

@@ -121,12 +121,14 @@ func getUserID(ctx context.Context, tx *sql.Tx, login string, domain string) (st
 				return "", fmt.Errorf("alternate user %s not found", alternateLogin)
 			}
 
+			slog.InfoContext(ctx, fmt.Sprintf("alternate user %s found", alternateLogin))
+
 			return dmAlternateUser.UserID, nil
 		} else {
-			return "", fmt.Errorf("user %s not found and no alternate", login)
+			return "", fmt.Errorf("domain %s does not have catch all user", dmDomain.Name)
 		}
 	} else {
-		slog.InfoContext(ctx, fmt.Sprintf("found user: ", login))
+		slog.InfoContext(ctx, fmt.Sprintf("found user: %s", login))
 
 		return dmUser.UserID, nil
 	}
