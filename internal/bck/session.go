@@ -15,8 +15,7 @@ import (
 type session struct {
 	login         string
 	from          string
-	to            string
-	local         bool
+	to            map[string]bool // value is local or not, key is the email address
 	authenticated bool
 	ctx           context.Context
 	server        srv.Servr
@@ -54,8 +53,7 @@ func (s *session) Reset() {
 
 	s.login = ""
 	s.from = ""
-	s.to = ""
-	s.local = false
+	clear(s.to)
 }
 
 func (s *session) Logout() error {
@@ -64,7 +62,7 @@ func (s *session) Logout() error {
 	return nil
 }
 
-func (s *session) Mail(from string, opts *smtp.MailOptions) error {
+func (s *session) Mail(from string, _ *smtp.MailOptions) error {
 	// log the tls status
 	_, ok := s.conn.TLSConnectionState()
 	message := "current session is TLS"
@@ -81,9 +79,8 @@ func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 	return nil
 }
 
-func (s *session) Rcpt(to string, opts *smtp.RcptOptions) error {
-	s.to = to
-	slog.InfoContext(s.ctx, fmt.Sprintf("to: %s", s.to))
+func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
+	slog.InfoContext(s.ctx, fmt.Sprintf("to: %s", to))
 
 	// get usr and domain
 	usr, domain, err := s.server.GetLoginAndDomain(s.ctx, to)
@@ -103,13 +100,13 @@ func (s *session) Rcpt(to string, opts *smtp.RcptOptions) error {
 
 		slog.InfoContext(s.ctx, fmt.Sprintf("checked local user: %s and domain: %s", usr, domain))
 
-		s.local = true
+		s.to[to] = true
 	} else {
 		if s.authenticated {
 			// attach to queue
 			slog.InfoContext(s.ctx, fmt.Sprintf("will relay, as it is authenticated: %s", s.login))
 
-			s.local = false
+			s.to[to] = false
 		} else {
 			slog.InfoContext(s.ctx, fmt.Sprintf("will not relay: must be authenticated: %s", s.login))
 
@@ -128,11 +125,22 @@ func (s *session) Data(r io.Reader) error {
 		return err
 	}
 
-	if s.local {
-		err = s.server.DeliverLocally(s.ctx, s.to, bytes)
-	} else {
-		err = s.server.DeliverQueue(s.ctx, s.from, s.to, bytes)
+	var relay []string
+
+	for email, local := range s.to {
+		if local {
+			err = s.server.DeliverLocally(s.ctx, email, bytes)
+
+			if err != nil {
+				slog.ErrorContext(s.ctx, fmt.Sprintf("error delivering locally delivery locally email: %s, error: %s", email, err.Error()))
+			}
+		} else {
+			relay = append(relay, email)
+		}
 	}
+
+	// if the relay is larger than zero, then we address this
+	s.server.DeliverQueue(s.ctx, s.from, relay, bytes)
 
 	return err
 }

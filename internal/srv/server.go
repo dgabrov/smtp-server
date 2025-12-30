@@ -19,7 +19,7 @@ type Servr interface {
 	IsLocalDomain(context context.Context, domain string) (bool, error)
 	CheckLocalUserAndDomain(context context.Context, login string, domain string) error
 	DeliverLocally(context context.Context, to string, body []byte) error
-	DeliverQueue(context context.Context, from string, to string, bytes []byte) error
+	DeliverQueue(context context.Context, from string, to []string, bytes []byte) error
 }
 
 type server struct {
@@ -60,16 +60,32 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte)
 	return tx.Commit()
 }
 
-func (s *server) DeliverQueue(context context.Context, from string, to string, bytes []byte) error {
+func (s *server) DeliverQueue(context context.Context, from string, to []string, bytes []byte) error {
+	if len(to) == 0 {
+		// no recipients to be relayed
+		return nil
+	}
+
 	tx := getTx(context, s.db)
 	defer tx.Rollback()
 
-	qr := "insert into queue (queue_id, from_addr, to_addr, body) values (?, ?, ?, ?)"
+	qr := "insert into queue (queue_id, from_addr, body) values (?, ?, ?)"
 	id := uuid.NewString()
 
-	_, err := tx.Exec(qr, id, from, to, bytes)
+	_, err := tx.Exec(qr, id, from, bytes)
 	if err != nil {
 		return err
+	}
+
+	// and now the recipients
+	qr = "insert into queue_recipient (queue_recipient_id, queue_id, to_addr) values (?, ?, ?)"
+	for _, toAddress := range to {
+		qrID := uuid.NewString()
+		_, err = tx.Exec(qr, qrID, id, toAddress)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
