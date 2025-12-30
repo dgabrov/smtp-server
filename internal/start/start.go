@@ -19,11 +19,14 @@ import (
 
 func Start() error {
 
-	configureLogger()
 	config, err := data.LoadConfig()
 	if err != nil {
 		return err
 	}
+
+	configureLogger(config)
+
+	data.LogConfig(config)
 
 	dbConfig := config.Db
 	db, err := getDatabaseConnectionPool(dbConfig.Machine, dbConfig.Port, dbConfig.Login, dbConfig.Password, dbConfig.Database)

@@ -6,4 +6,9 @@ done - downgrade user and group after listening to the ports
 done - externalize all config data
 - try to deploy
 done - persistence
-- test persistence with client
+done - test persistence with client
+- catchall user
+- delete machine
+- create another machine
+- build this in docker and store
+- put rolling file appender functionality and proceed

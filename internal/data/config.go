@@ -30,6 +30,13 @@ type ConfigData struct {
 		Password string
 		Database string
 	}
+	Log struct {
+		Filename   string
+		MaxSize    int
+		MaxAge     int
+		Compress   bool
+		MaxBackups int
+	}
 }
 
 func LoadConfig() (ConfigData, error) {
@@ -48,12 +55,10 @@ func LoadConfig() (ConfigData, error) {
 
 	slog.Info("config data successfully loaded")
 
-	logConfig(config)
-
 	return config, nil
 }
 
-func logConfig(config ConfigData) {
+func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("domain: %s", config.Domain))
 	slog.Info(fmt.Sprintf("listenAddress: %s", config.ListenAddress))
 	slog.Info(fmt.Sprintf("readTimeoutSecond: %d", config.ReadTimeoutSecond))
@@ -70,4 +75,10 @@ func logConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("db login: %s", config.Db.Login))
 	slog.Info(fmt.Sprintf("db password length: %d", len(config.Db.Password)))
 	slog.Info(fmt.Sprintf("db database: %s", config.Db.Database))
+
+	slog.Info(fmt.Sprintf("log fileName: %s", config.Log.Filename))
+	slog.Info(fmt.Sprintf("log maxSize: %d", config.Log.MaxSize))
+	slog.Info(fmt.Sprintf("log maxAge: %d", config.Log.MaxAge))
+	slog.Info(fmt.Sprintf("log compress: %t", config.Log.Compress))
+	slog.Info(fmt.Sprintf("log maxBackups: %d", config.Log.MaxBackups))
 }

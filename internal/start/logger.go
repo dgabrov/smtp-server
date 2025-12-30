@@ -3,7 +3,9 @@ package start
 import (
 	"context"
 	"log/slog"
-	"os"
+
+	"github.com/dgb9/smtp-server/internal/data"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const uuidKey = "uuid"
@@ -21,8 +23,18 @@ func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-func configureLogger() {
-	baseHandler := slog.NewJSONHandler(os.Stdout, nil)
+func configureLogger(c data.ConfigData) {
+	logConfig := c.Log
+
+	lumberjackLogger := &lumberjack.Logger{
+		Filename:   logConfig.Filename,
+		MaxSize:    logConfig.MaxSize,    // megabytes before rotation
+		MaxBackups: logConfig.MaxBackups, // max number of old log files to keep
+		MaxAge:     logConfig.MaxAge,     // max days to retain old log files
+		Compress:   logConfig.Compress,   // whether to compress (gzip) old log files
+	}
+
+	baseHandler := slog.NewJSONHandler(lumberjackLogger, nil)
 	logger := slog.New(&ContextHandler{baseHandler})
 
 	// Set as global logger

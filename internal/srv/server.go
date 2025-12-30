@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/google/uuid"
 )
 
@@ -91,40 +92,105 @@ func (s *server) CheckLocalUserAndDomain(context context.Context, login string, 
 }
 
 func getUserID(ctx context.Context, tx *sql.Tx, login string, domain string) (string, error) {
-	qr := "select mu.user_id from mailbox_user mu, domain d where mu.domain_id = d.domain_id and d.name = ? and mu.login = ?"
-	rs, err := tx.QueryContext(ctx, qr, strings.ToLower(domain), strings.ToLower(login))
+	dmDomain, err := getDomainByName(ctx, tx, domain)
 	if err != nil {
 		return "", err
 	}
-	defer rs.Close()
-
-	userID := ""
-
-	if rs.Next() {
-		err = rs.Scan(&userID)
-		if err != nil {
-			return "", err
-		}
+	if dmDomain == nil {
+		return "", errors.New("domain not found")
 	}
 
-	return userID, nil
+	dmUser, err := getDestinationUser(ctx, tx, dmDomain.DomainID, login)
+	if err != nil {
+		return "", err
+	}
+
+	if dmUser == nil {
+		// user not found, try alternate
+		slog.InfoContext(ctx, fmt.Sprintf("user %s not found, attempt alternate", login))
+
+		if dmDomain.CatchAll {
+			alternateLogin := dmDomain.CatchAllLogin
+
+			dmAlternateUser, err := getDestinationUser(ctx, tx, dmDomain.DomainID, alternateLogin)
+			if err != nil {
+				return "", err
+			}
+
+			if dmAlternateUser == nil {
+				return "", fmt.Errorf("alternate user %s not found", alternateLogin)
+			}
+
+			return dmAlternateUser.UserID, nil
+		} else {
+			return "", fmt.Errorf("user %s not found and no alternate", login)
+		}
+	} else {
+		slog.InfoContext(ctx, fmt.Sprintf("found user: ", login))
+
+		return dmUser.UserID, nil
+	}
+
+}
+
+func getDomainByName(ctx context.Context, tx *sql.Tx, domain string) (*data.DmDomain, error) {
+	dm := strings.ToLower(domain)
+	qr := "select domain_id, name, catchall_ind, catchall_login from domain where name = ?"
+	rs, err := tx.QueryContext(ctx, qr, dm)
+	if err != nil {
+		return nil, err
+	}
+	defer rs.Close()
+
+	if rs.Next() {
+		val := data.DmDomain{}
+		isCatchAll := ""
+		err = rs.Scan(&val.DomainID, &val.Name, &isCatchAll, &val.CatchAllLogin)
+		if err != nil {
+			return nil, err
+		}
+
+		val.CatchAll = isCatchAll == "Y"
+
+		return &val, nil
+	}
+
+	return nil, nil
+}
+
+func getDestinationUser(ctx context.Context, tx *sql.Tx, domainID string, user string) (*data.DmUser, error) {
+	usr := strings.ToLower(user)
+	qr := "select user_id, domain_id, login, password from mailbox_user where domain_id = ? and login = ?"
+
+	rs, err := tx.QueryContext(ctx, qr, domainID, usr)
+	if err != nil {
+		return nil, err
+	}
+	defer rs.Close()
+
+	if rs.Next() {
+		val := data.DmUser{}
+		err = rs.Scan(&val.UserID, &val.DomainID, &val.Login, &val.Password)
+		if err != nil {
+			return nil, err
+		}
+
+		return &val, nil
+	}
+
+	return nil, nil
 }
 
 func (s *server) IsLocalDomain(context context.Context, domain string) (bool, error) {
 	tx := getTx(context, s.db)
 	defer tx.Rollback()
-	res := false
 
-	qr := "select 1 from domain where name = ?"
-	rs, err := tx.QueryContext(context, qr, strings.ToLower(domain))
+	dmDomain, err := getDomainByName(context, tx, domain)
 	if err != nil {
-		return res, err
+		return false, err
 	}
-	defer rs.Close()
 
-	if rs.Next() {
-		res = true
-	}
+	res := dmDomain != nil
 
 	err = tx.Commit()
 

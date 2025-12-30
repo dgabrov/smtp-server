@@ -20,5 +20,13 @@
     "login": "smtp",
     "password": "smtp",
     "database": "smtp"
+  },
+  "log": {
+    "fileName": "/home/daniel/IdeaProjects/smtp-server/logs/smtp.log",
+    "maxSize": 100,
+    "maxBackups": 30,
+    "maxAge": 365,
+    "compress": true
   }
+
 }
