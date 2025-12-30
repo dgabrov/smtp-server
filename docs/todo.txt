@@ -14,7 +14,7 @@ done - test persistence with client
 - put rolling file appender functionality and proceed
 
 done - create entry in docker registry 169533462518.dkr.ecr.us-east-2.amazonaws.com/smtp-server
-- create docker file and ensure it works fine # CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o smtp-server-go main.go
+done - create docker file and ensure it works fine # CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o smtp-server-go main.go
 - put the git build and ensure it works well
 - go existent machine
 - take keys public and private
