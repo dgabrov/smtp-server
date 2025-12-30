@@ -16,6 +16,7 @@ func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	return &session{
 		server: b.server,
 		ctx:    context.WithValue(context.Background(), "uuid", uuid.NewString()),
+		conn:   c,
 	}, nil
 }
 

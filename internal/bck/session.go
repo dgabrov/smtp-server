@@ -20,6 +20,7 @@ type session struct {
 	authenticated bool
 	ctx           context.Context
 	server        srv.Servr
+	conn          *smtp.Conn
 }
 
 func (s *session) AuthMechanisms() []string {
@@ -55,7 +56,6 @@ func (s *session) Reset() {
 	s.from = ""
 	s.to = ""
 	s.local = false
-	s.authenticated = false
 }
 
 func (s *session) Logout() error {
@@ -65,6 +65,16 @@ func (s *session) Logout() error {
 }
 
 func (s *session) Mail(from string, opts *smtp.MailOptions) error {
+	// log the tls status
+	_, ok := s.conn.TLSConnectionState()
+	message := "current session is TLS"
+
+	if !ok {
+		message = "current session is NOT TLS"
+	}
+
+	slog.InfoContext(s.ctx, message)
+
 	s.from = from
 	slog.InfoContext(s.ctx, fmt.Sprintf("mail: %s", s.from))
 
