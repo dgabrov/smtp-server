@@ -1,5 +1,5 @@
-name: build todo api go
-run-name: build todo api go
+name: build smtp server go
+run-name: build smtp server go
 on:
   workflow_dispatch:
 
@@ -15,7 +15,7 @@ jobs:
         run: |
           echo ${GITHUB_RUN_NUMBER}
           echo $(pwd)
-          GOARCH=amd64 GOOS=linux CGO_ENABLED=0 docker run -v $(pwd):/alfa -w /alfa golang:1.25.4-alpine3.20 go build -o smtp-server-go ./main.go
+          GOARCH=amd64 GOOS=linux CGO_ENABLED=0 docker run -v $(pwd):/alfa -w /alfa golang:1.25.5-alpine3.23 go build -o smtp-server-go ./main.go
           echo $(pwd)
           docker build . -t 169533462518.dkr.ecr.us-east-2.amazonaws.com/smtp-server:1.0.${GITHUB_RUN_NUMBER}
 
