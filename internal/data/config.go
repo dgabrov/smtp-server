@@ -18,6 +18,10 @@ type ConfigData struct {
 		Public  string
 		Private string
 	}
+
+	Enabled587 bool
+	Address587 string
+
 	Db struct {
 		Machine  string
 		Port     int
@@ -62,6 +66,8 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("allowInsecureAuth: %v", config.AllowInsecureAuth))
 	slog.Info(fmt.Sprintf("public key: %s", config.Certificates.Public))
 	slog.Info(fmt.Sprintf("private key: %s", config.Certificates.Private))
+	slog.Info(fmt.Sprintf("587 enabled: %t", config.Enabled587))
+	slog.Info(fmt.Sprintf("587 listen address: %s", config.Address587))
 	slog.Info(fmt.Sprintf("db machine: %s", config.Db.Machine))
 	slog.Info(fmt.Sprintf("db port: %d", config.Db.Port))
 	slog.Info(fmt.Sprintf("db login: %s", config.Db.Login))
@@ -73,4 +79,5 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("log maxAge: %d", config.Log.MaxAge))
 	slog.Info(fmt.Sprintf("log compress: %t", config.Log.Compress))
 	slog.Info(fmt.Sprintf("log maxBackups: %d", config.Log.MaxBackups))
+
 }

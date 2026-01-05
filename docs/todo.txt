@@ -1,39 +1,23 @@
-- configure slog for files
-done - configure slog for context
-- verify dmarc
-- verify spf
-done - downgrade user and group after listening to the ports
-done - externalize all config data
-- try to deploy
-done - persistence
-done - test persistence with client
-done - catchall user
-
-done - create entry in docker registry 169533462518.dkr.ecr.us-east-2.amazonaws.com/smtp-server
-done - create docker file and ensure it works fine # CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o smtp-server-go main.go
-done - put the git build and ensure it works well
-done - go existent machine
-done - take keys public and private
-done - confirm domains that get mail there
-done - create scripts to enter users, mailboxes etc and some password etc
-done - delete machine
-done - create new machine
-done - copy keys
-done - install mysql or maria db
-done - create user
-done - create database
-done - run the scripts to create domains etc
-done - get ip address and operate it through SPF and MX entries for the two
-
-- log the tls status
-
-insert into domain (domain_id, name, catchall_ind, catchall_login) values ('mltt', 'mltt.site', 'Y', 'office');
-insert into mailbox_user (user_id, domain_id, login, password) values ('dgabrov', 'mltt', 'dgabrov', '3f7e37468469d56e2673b035784aeda1822444583185ee5b91c2189a12832ff2ed36aa260accad0463c705019dff1d1ad16a4bf6bb2050a25c93d0f4b130f18b');
-insert into mailbox_user (user_id, domain_id, login, password) values ('office', 'mltt', 'office', '3f7e37468469d56e2673b035784aeda1822444583185ee5b91c2189a12832ff2ed36aa260accad0463c705019dff1d1ad16a4bf6bb2050a25c93d0f4b130f18b');
-insert into mailbox (mailbox_id, user_id, name) values ('1', 'dgabrov', 'INBOX');
-insert into mailbox (mailbox_id, user_id, name) values ('2', 'office', 'INBOX');
-
 docker run -v smtp_config:/config -v smtp_logs:/logs -e CONFIG_FILE=/config/config.json -p 25:8225 -d 169533462518.dkr.ecr.us-east-2.amazonaws.com/smtp-server:1.0.5
 for login on the docker you use
 
 aws ecr get-login-password --region us-east-2 --profile docker | docker login --username AWS --password-stdin 169533462518.dkr.ecr.us-east-2.amazonaws.com
+
+- 25 should not require starttls, however 587 must
+- deliver messages
+
+--- todo list for the message routing
+
+-- see again how you do it to ensure the select with timeout
+--
+
+
+================
+- get the entry
+- get the mx entry
+- for each mx entry try to connect
+- from, rcpt and then data
+- get the errors and then log them
+- the error from data is advisory: if you get there, mark it as done
+- add check for the SPF - at least advisory
+- add 

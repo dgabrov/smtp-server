@@ -9,6 +9,8 @@
     "public": "/home/daniel/IdeaProjects/smtp-server/docs/cert.pem",
     "private": "/home/daniel/IdeaProjects/smtp-server/docs/key.pem"
   },
+  "enabled587": true,
+  "address587": "0.0.0.0:8587",
   "downgrade": {
     "downgrade": false,
     "gid": 10,

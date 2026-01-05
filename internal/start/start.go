@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/srv"
@@ -33,7 +34,60 @@ func Start() error {
 		return err
 	}
 
-	return proceedMainPort(config, db)
+	server := srv.NewServer(db)
+	be := bck.NewBackend(server)
+
+	tlsConfig, err := loadCertificates(config)
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1) // 25 is open no matter what
+	if config.Enabled587 {
+		wg.Add(1) // if enabled 587, add another one as well
+	}
+
+	go func() {
+		err = proceedMainPort(config, wg, be, tlsConfig, config.ListenAddress)
+
+		if err != nil {
+			slog.Error(fmt.Sprintf("error running main listener: %s", err.Error()))
+		}
+	}()
+
+	if config.Enabled587 {
+		go func() {
+			err = proceedMainPort(config, wg, be, tlsConfig, config.Address587)
+
+			if err != nil {
+				slog.Error(fmt.Sprintf("error running main listener: %s", err.Error()))
+			}
+		}()
+
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func loadCertificates(config data.ConfigData) (*tls.Config, error) {
+	// 3. Mandatory TLS Configuration
+	cert, err := tls.LoadX509KeyPair(
+		config.Certificates.Public,
+		config.Certificates.Private,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		// Ensures we use modern, secure protocols
+		MinVersion: tls.VersionTLS12,
+	}, nil
 }
 
 func getDatabaseConnectionPool(machine string, port int, login string, password string, database string) (*sql.DB, error) {
@@ -54,11 +108,8 @@ func getDatabaseConnectionPool(machine string, port int, login string, password 
 	return db, nil
 }
 
-func proceedMainPort(config data.ConfigData, db *sql.DB) error {
-	// 1. Setup Backend (The logic for auth and mail handling)
-	// You must implement the 'Backend' and 'Session' interfaces
-	server := srv.NewServer(db)
-	be := bck.NewBackend(server)
+func proceedMainPort(config data.ConfigData, wg sync.WaitGroup, be smtp.Backend, tlsConfig *tls.Config, listenAddress string) error {
+	defer wg.Done()
 
 	// 2. Initialize the Server
 	s := smtp.NewServer(be)
@@ -70,30 +121,15 @@ func proceedMainPort(config data.ConfigData, db *sql.DB) error {
 	s.WriteTimeout = time.Duration(config.WriteTimeoutSecond) * time.Second
 	s.MaxMessageBytes = config.MaxMessageBytes
 
-	// 3. Mandatory TLS Configuration
-	cert, err := tls.LoadX509KeyPair(
-		config.Certificates.Public,
-		config.Certificates.Private,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	s.TLSConfig = &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		// Ensures we use modern, secure protocols
-		MinVersion: tls.VersionTLS12,
-	}
+	s.TLSConfig = tlsConfig
 
 	// 4. Force TLS for Authentication
 	// This prevents the server from accepting AUTH commands over plain text
 	s.AllowInsecureAuth = config.AllowInsecureAuth
 
-	address := config.ListenAddress
-	slog.Info(fmt.Sprintf("Starting SMTP Server on %s", address))
+	slog.Info(fmt.Sprintf("Starting SMTP Server on %s", listenAddress))
 
-	l, err := net.Listen("tcp", address)
+	l, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}
