@@ -29,6 +29,13 @@
     "maxBackups": 30,
     "maxAge": 365,
     "compress": true
+  },
+  "queue": {
+    "timeBetweenLoads": 60,
+    "loadSize": 10,
+    "maxAttempts": 5,
+    "timeBetweenAttempts": 100,
+    "simultaneousProcessing": 2
   }
 
 }

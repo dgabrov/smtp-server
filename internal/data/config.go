@@ -7,6 +7,13 @@ import (
 	"os"
 )
 
+type QueueConfig struct {
+	TimeBetweenLoads       int
+	LoadSize               int
+	MaxAttempts            int
+	TimeBetweenAttempts    int
+	SimultaneousProcessing int
+}
 type ConfigData struct {
 	Domain             string
 	ListenAddress      string
@@ -36,6 +43,7 @@ type ConfigData struct {
 		Compress   bool
 		MaxBackups int
 	}
+	Queue QueueConfig
 }
 
 func LoadConfig() (ConfigData, error) {
@@ -79,5 +87,11 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("log maxAge: %d", config.Log.MaxAge))
 	slog.Info(fmt.Sprintf("log compress: %t", config.Log.Compress))
 	slog.Info(fmt.Sprintf("log maxBackups: %d", config.Log.MaxBackups))
+
+	slog.Info(fmt.Sprintf("log queue simultaneousProcessing: %d", config.Queue.SimultaneousProcessing))
+	slog.Info(fmt.Sprintf("log queue maxAttempts: %d", config.Queue.MaxAttempts))
+	slog.Info(fmt.Sprintf("log queue timeBetweenAttempts: %d", config.Queue.TimeBetweenAttempts))
+	slog.Info(fmt.Sprintf("log queue timeBetweenLoads: %d", config.Queue.TimeBetweenLoads))
+	slog.Info(fmt.Sprintf("log queue loadSize: %d", config.Queue.LoadSize))
 
 }

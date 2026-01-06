@@ -19,5 +19,8 @@ aws ecr get-login-password --region us-east-2 --profile docker | docker login --
 - from, rcpt and then data
 - get the errors and then log them
 - the error from data is advisory: if you get there, mark it as done
-- add check for the SPF - at least advisory
-- add 
+
+- how many load once
+- after error, after how long retry
+- how many retries till failure
+

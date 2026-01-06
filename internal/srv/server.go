@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/google/uuid"
@@ -20,10 +21,154 @@ type Servr interface {
 	CheckLocalUserAndDomain(context context.Context, login string, domain string) error
 	DeliverLocally(context context.Context, to string, body []byte) error
 	DeliverQueue(context context.Context, from string, to []string, bytes []byte) error
+	MarkQueueItemSuccess(context context.Context, queueItemID string) error
+	AddQueueItemError(ctx context.Context, queueItemID string) error
+	LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueue, error)
+	LoadQueueRecipients(ctx context.Context, config data.QueueConfig) ([]*data.DmQueueRecipient, error)
+}
+
+func NewServer(db *sql.DB) Servr {
+	return &server{db: db}
 }
 
 type server struct {
 	db *sql.DB
+}
+
+func (s *server) LoadQueueRecipients(ctx context.Context, config data.QueueConfig) ([]*data.DmQueueRecipient, error) {
+	// condition to load the values are 1. success_ind not true, 2. last attempted smaller than the current timestamp minus delay
+	// no more than whatever slice size
+
+	qr := `select queue_recipient_id, queue_id, to_addr, attempts, 
+       last_attempted_dt, success_ind 
+			from queue_recipient 
+			where success_ind != 'Y' 
+			and (last_attempted_dt is null or last_attempted_dt < ?) and attempts < ? limit ?`
+
+	timeProcessing := time.Now().Add(time.Duration(-config.TimeBetweenAttempts) * time.Second)
+
+	rs, err := s.db.QueryContext(ctx, qr, timeProcessing, config.MaxAttempts, config.LoadSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rs.Close()
+
+	var res []*data.DmQueueRecipient
+
+	for rs.Next() {
+		item := data.DmQueueRecipient{}
+
+		var s string
+		var lastAttemptedDt sql.NullTime
+
+		err = rs.Scan(&item.QueueRecipientID, &item.QueueID, &item.ToAddr, &item.Attempts, &lastAttemptedDt, &s)
+
+		item.Success = strings.ToUpper(s) == "Y"
+		item.LastAttemptedDt = lastAttemptedDt.Time
+
+		res = append(res, &item)
+	}
+
+	return res, nil
+
+}
+
+func (s *server) LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueue, error) {
+	var res *data.DmQueue
+	qr := "select queue_id, from_addr, body from queue where queue_id = ?"
+	st, err := s.db.PrepareContext(ctx, qr)
+	if err != nil {
+		return nil, err
+	}
+	defer st.Close()
+
+	rows, err := st.QueryContext(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		res = &data.DmQueue{}
+
+		err = rows.Scan(res.QueueID, res.From, res.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return res, nil
+	}
+
+	return nil, fmt.Errorf("queue item with the id %s does not exist", id)
+}
+
+func (s *server) MarkQueueItemSuccess(ctx context.Context, queueItemID string) error {
+	now := time.Now()
+	qr := "update queue_recipient set success_ind = 'Y', last_attempted_dt = ? where queue_recipient_id = ?"
+	st, err := s.db.PrepareContext(ctx, qr)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	_, err = st.ExecContext(ctx, now, queueItemID)
+
+	return err
+}
+
+func (s *server) AddQueueItemError(ctx context.Context, queueItemID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	nrAttempts, err := getNrAttempts(ctx, tx, queueItemID)
+	if err != nil {
+		return err
+	}
+
+	err = updateQueueItem(ctx, tx, queueItemID, nrAttempts+1)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func updateQueueItem(ctx context.Context, tx *sql.Tx, queueItemID string, nrAttempts int) error {
+	qr := "update queue_recipient set attempts = ?, last_attempted_dt = ? where queue_recipient_id = ?"
+
+	_, err := tx.ExecContext(ctx, qr, nrAttempts, time.Now(), queueItemID)
+
+	return err
+}
+
+func getNrAttempts(ctx context.Context, tx *sql.Tx, id string) (int, error) {
+	qr := "select attempts from queue_recipient where queue_recipient_id = ?"
+	var nr int
+	st, err := tx.PrepareContext(ctx, qr)
+	if err != nil {
+		return 0, err
+	}
+	defer st.Close()
+	rows, err := st.QueryContext(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.Scan(&nr)
+
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		return 0, fmt.Errorf("queue item with the id %s does not exist", id)
+	}
+
+	return nr, nil
 }
 
 func (s *server) DeliverLocally(context context.Context, to string, body []byte) error {
@@ -252,10 +397,6 @@ func (s *server) Authenticate(context context.Context, username string, password
 	}
 
 	return tx.Commit()
-}
-
-func NewServer(db *sql.DB) Servr {
-	return &server{db: db}
 }
 
 func getLoginAndDomain(email string) (string, string, error) {

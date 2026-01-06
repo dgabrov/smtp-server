@@ -1,5 +1,7 @@
 package data
 
+import "time"
+
 type DmDomain struct {
 	DomainID      string
 	Name          string
@@ -29,6 +31,14 @@ type DmMessage struct {
 type DmQueue struct {
 	QueueID string
 	From    string
-	To      string
 	Body    string
+}
+
+type DmQueueRecipient struct {
+	QueueRecipientID string
+	QueueID          string
+	ToAddr           string
+	Attempts         int
+	LastAttemptedDt  time.Time
+	Success          bool
 }
