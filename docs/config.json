@@ -11,11 +11,6 @@
   },
   "enabled587": true,
   "address587": "0.0.0.0:8587",
-  "downgrade": {
-    "downgrade": false,
-    "gid": 10,
-    "uid": 12
-  },
   "db": {
     "machine": "localhost",
     "port": 3306,
