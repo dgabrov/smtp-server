@@ -67,7 +67,7 @@ func Start() error {
 		}()
 	}
 
-	go queue.StartQueue(&wg, config.Queue, server)
+	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain)
 
 	wg.Wait()
 

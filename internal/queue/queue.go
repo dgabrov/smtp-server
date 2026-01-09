@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,7 +14,7 @@ import (
 	"github.com/dgb9/smtp-server/internal/srv"
 )
 
-func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr) {
+func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, tlsConfig *tls.Config, localDomain string) {
 	loaderChannel := make(chan *data.DmQueueRecipient, 1)
 
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -21,7 +22,7 @@ func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr) {
 	go startLoader(ctx, config, server, loaderChannel)
 
 	for i := 0; i < config.SimultaneousProcessing; i++ {
-		go processQueue(ctx, server, loaderChannel, config.TimeBetweenAttempts)
+		go processQueue(ctx, server, loaderChannel, tlsConfig, localDomain)
 	}
 
 	wg.Done()
@@ -55,7 +56,7 @@ func startLoader(ctx context.Context, config data.QueueConfig, server srv.Servr,
 	}
 }
 
-func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQueueRecipient, errorDelay int) {
+func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string) {
 	for {
 		var item *data.DmQueueRecipient
 		select {
@@ -63,7 +64,7 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 			slog.Info("processing terminated")
 			break
 		case item = <-channel:
-			slog.Info(fmt.Sprintf("processing item: ", item.QueueRecipientID))
+			slog.Info(fmt.Sprintf("processing item: %s", item.QueueRecipientID))
 		}
 
 		// processing an item
@@ -74,7 +75,7 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 		}
 
 		// let's process them
-		err = processMailQueueItem(queue, item) // this does mx all the stuff there
+		err = processMailQueueItem(queue, item, tlsConfig, localDomain) // this does mx all the stuff there
 		if err != nil {
 			_ = server.AddQueueItemError(ctx, item.QueueRecipientID)
 		} else {
@@ -83,9 +84,6 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 	}
 }
 
-func processMailQueueItem(queue *data.DmQueue, item *data.DmQueueRecipient) error {
-	// this is the big stuff, will be in separate file
-	slog.Info(fmt.Sprintf("processing ok the item with the id: %s for the queue id: %s", item.QueueRecipientID, item.QueueID))
-
-	return nil
+func processMailQueueItem(queue *data.DmQueue, item *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string) error {
+	return ProcItem(queue.From, item.ToAddr, &queue.Body, tlsConfig, localDomain, 25)
 }
