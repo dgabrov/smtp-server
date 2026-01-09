@@ -74,7 +74,7 @@ func (s *server) LoadQueueRecipients(ctx context.Context, config data.QueueConfi
 }
 
 func (s *server) LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueue, error) {
-	var res *data.DmQueue
+	var res data.DmQueue
 	qr := "select queue_id, from_addr, body from queue where queue_id = ?"
 	st, err := s.db.PrepareContext(ctx, qr)
 	if err != nil {
@@ -89,14 +89,14 @@ func (s *server) LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueu
 	defer rows.Close()
 
 	if rows.Next() {
-		res = &data.DmQueue{}
+		res = data.DmQueue{}
 
-		err = rows.Scan(res.QueueID, res.From, res.Body)
+		err = rows.Scan(&res.QueueID, &res.From, &res.Body)
 		if err != nil {
 			return nil, err
 		}
 
-		return res, nil
+		return &res, nil
 	}
 
 	return nil, fmt.Errorf("queue item with the id %s does not exist", id)
