@@ -18,6 +18,11 @@
     "password": "smtp",
     "database": "smtp"
   },
+  "dkim":{
+    "enabled": true,
+    "privateKey": "/home/daniel/IdeaProjects/smtp-server/docs/dkim_private.pem",
+    "selector": "default"
+  },
   "log": {
     "fileName": "/home/daniel/IdeaProjects/smtp-server/logs/smtp.log",
     "maxSize": 100,
