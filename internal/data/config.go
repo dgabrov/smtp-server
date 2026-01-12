@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+type DkimConfig struct {
+	Enabled    bool
+	PrivateKey string
+	Selector   string
+}
+
 type QueueConfig struct {
 	TimeBetweenLoads       int
 	LoadSize               int
@@ -36,7 +42,8 @@ type ConfigData struct {
 		Password string
 		Database string
 	}
-	Log struct {
+	Dkim DkimConfig
+	Log  struct {
 		Filename   string
 		MaxSize    int
 		MaxAge     int
@@ -76,22 +83,30 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("private key: %s", config.Certificates.Private))
 	slog.Info(fmt.Sprintf("587 enabled: %t", config.Enabled587))
 	slog.Info(fmt.Sprintf("587 listen address: %s", config.Address587))
-	slog.Info(fmt.Sprintf("db machine: %s", config.Db.Machine))
-	slog.Info(fmt.Sprintf("db port: %d", config.Db.Port))
-	slog.Info(fmt.Sprintf("db login: %s", config.Db.Login))
-	slog.Info(fmt.Sprintf("db password length: %d", len(config.Db.Password)))
-	slog.Info(fmt.Sprintf("db database: %s", config.Db.Database))
 
-	slog.Info(fmt.Sprintf("log fileName: %s", config.Log.Filename))
-	slog.Info(fmt.Sprintf("log maxSize: %d", config.Log.MaxSize))
-	slog.Info(fmt.Sprintf("log maxAge: %d", config.Log.MaxAge))
-	slog.Info(fmt.Sprintf("log compress: %t", config.Log.Compress))
-	slog.Info(fmt.Sprintf("log maxBackups: %d", config.Log.MaxBackups))
+	configDb := config.Db
+	slog.Info(fmt.Sprintf("db machine: %s", configDb.Machine))
+	slog.Info(fmt.Sprintf("db port: %d", configDb.Port))
+	slog.Info(fmt.Sprintf("db login: %s", configDb.Login))
+	slog.Info(fmt.Sprintf("db password length: %d", len(configDb.Password)))
+	slog.Info(fmt.Sprintf("db database: %s", configDb.Database))
 
-	slog.Info(fmt.Sprintf("log queue simultaneousProcessing: %d", config.Queue.SimultaneousProcessing))
-	slog.Info(fmt.Sprintf("log queue maxAttempts: %d", config.Queue.MaxAttempts))
-	slog.Info(fmt.Sprintf("log queue timeBetweenAttempts: %d", config.Queue.TimeBetweenAttempts))
-	slog.Info(fmt.Sprintf("log queue timeBetweenLoads: %d", config.Queue.TimeBetweenLoads))
-	slog.Info(fmt.Sprintf("log queue loadSize: %d", config.Queue.LoadSize))
+	configLog := config.Log
+	slog.Info(fmt.Sprintf("log fileName: %s", configLog.Filename))
+	slog.Info(fmt.Sprintf("log maxSize: %d", configLog.MaxSize))
+	slog.Info(fmt.Sprintf("log maxAge: %d", configLog.MaxAge))
+	slog.Info(fmt.Sprintf("log compress: %t", configLog.Compress))
+	slog.Info(fmt.Sprintf("log maxBackups: %d", configLog.MaxBackups))
 
+	configQueue := config.Queue
+	slog.Info(fmt.Sprintf("log queue simultaneousProcessing: %d", configQueue.SimultaneousProcessing))
+	slog.Info(fmt.Sprintf("log queue maxAttempts: %d", configQueue.MaxAttempts))
+	slog.Info(fmt.Sprintf("log queue timeBetweenAttempts: %d", configQueue.TimeBetweenAttempts))
+	slog.Info(fmt.Sprintf("log queue timeBetweenLoads: %d", configQueue.TimeBetweenLoads))
+	slog.Info(fmt.Sprintf("log queue loadSize: %d", configQueue.LoadSize))
+
+	dkimConfig := config.Dkim
+	slog.Info(fmt.Sprintf("dkim enabled: %t", dkimConfig.Enabled))
+	slog.Info(fmt.Sprintf("dkim private key: %s", dkimConfig.PrivateKey))
+	slog.Info(fmt.Sprintf("dkim selector: %s", dkimConfig.Selector))
 }

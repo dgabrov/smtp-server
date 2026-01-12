@@ -7,10 +7,10 @@ import (
 	"github.com/emersion/go-msgauth/dkim"
 )
 
-func signMessage(rawMsg []byte, privKey *rsa.PrivateKey) ([]byte, error) {
+func signMessage(rawMsg []byte, privKey *rsa.PrivateKey, mailDomain string, selector string) ([]byte, error) {
 	options := &dkim.SignOptions{
-		Domain:   "yourdomain.com",
-		Selector: "default", // <--- Must match your DNS record exactly
+		Domain:   mailDomain,
+		Selector: selector,
 		Signer:   privKey,
 		// Using Relaxed for both ensures slight header/body
 		// modifications by relays won't break the signature.

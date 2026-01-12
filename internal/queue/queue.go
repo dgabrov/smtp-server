@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
@@ -12,9 +13,10 @@ import (
 
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/dgb9/smtp-server/internal/srv"
+	"github.com/google/uuid"
 )
 
-func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, tlsConfig *tls.Config, localDomain string) {
+func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, tlsConfig *tls.Config, localDomain string, dkimConfig data.DkimConfig, dkimKey *rsa.PrivateKey) {
 	loaderChannel := make(chan *data.DmQueueRecipient, 1)
 
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -22,7 +24,7 @@ func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, t
 	go startLoader(ctx, config, server, loaderChannel)
 
 	for i := 0; i < config.SimultaneousProcessing; i++ {
-		go processQueue(ctx, server, loaderChannel, tlsConfig, localDomain)
+		go processQueue(ctx, server, loaderChannel, tlsConfig, localDomain, dkimConfig, dkimKey)
 	}
 
 	wg.Done()
@@ -56,7 +58,7 @@ func startLoader(ctx context.Context, config data.QueueConfig, server srv.Servr,
 	}
 }
 
-func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string) {
+func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string, dkimConfig data.DkimConfig, dkimKey *rsa.PrivateKey) {
 	for {
 		var item *data.DmQueueRecipient
 		select {
@@ -75,7 +77,8 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 		}
 
 		// let's process them
-		err = processMailQueueItem(queue, item, tlsConfig, localDomain) // this does mx all the stuff there
+		err = processMailQueueItem(queue, item, tlsConfig, localDomain, dkimConfig, dkimKey) // this does mx all the stuff there
+
 		if err != nil {
 			_ = server.AddQueueItemError(ctx, item.QueueRecipientID)
 		} else {
@@ -84,6 +87,8 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 	}
 }
 
-func processMailQueueItem(queue *data.DmQueue, item *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string) error {
-	return ProcItem(queue.From, item.ToAddr, &queue.Body, tlsConfig, localDomain, 25)
+func processMailQueueItem(queue *data.DmQueue, item *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string, config data.DkimConfig, dkimKey *rsa.PrivateKey) error {
+	ctx := context.WithValue(context.Background(), "uuid", uuid.NewString())
+
+	return ProcItem(ctx, queue.From, item.ToAddr, &queue.Body, tlsConfig, localDomain, 25, config.Enabled, config.Selector, dkimKey)
 }

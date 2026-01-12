@@ -1,11 +1,16 @@
 package start
 
 import (
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -43,6 +48,17 @@ func Start() error {
 		return err
 	}
 
+	// before anything, try to load the dkim key
+	dkimConfig := config.Dkim
+	var key *rsa.PrivateKey
+	if dkimConfig.Enabled {
+		key, err = loadPrivateKey(dkimConfig.PrivateKey)
+
+		if err != nil {
+			return err
+		}
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2) // 25 is open no matter what and the loader is also processing
 	if config.Enabled587 {
@@ -67,7 +83,7 @@ func Start() error {
 		}()
 	}
 
-	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain)
+	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain, dkimConfig, key)
 
 	wg.Wait()
 
@@ -139,4 +155,26 @@ func proceedMainPort(config data.ConfigData, wg *sync.WaitGroup, be smtp.Backend
 
 	return s.Serve(l)
 
+}
+
+// 1. Helper to load your private key from the .pem file
+func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	raw, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, ok := raw.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("failed to parse private key")
+	}
+	return privateKey, nil
 }

@@ -2,7 +2,9 @@ package start
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"os"
 
 	"github.com/dgb9/smtp-server/internal/data"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -34,7 +36,9 @@ func configureLogger(c data.ConfigData) {
 		Compress:   logConfig.Compress,   // whether to compress (gzip) old log files
 	}
 
-	baseHandler := slog.NewJSONHandler(lumberjackLogger, nil)
+	writer := io.MultiWriter(os.Stdout, lumberjackLogger)
+
+	baseHandler := slog.NewJSONHandler(writer, nil)
 	logger := slog.New(&ContextHandler{baseHandler})
 
 	// Set as global logger
