@@ -65,7 +65,7 @@ func ProcItem(ctx context.Context, from string, to string, message *string, tlsC
 		err = deliverMail(ctx, from, to, message, deliveryAddress, tlsConfig, localDomain)
 
 		if err == nil {
-			slog.InfoContext(ctx, "processed ok the item with the id: ", id)
+			slog.InfoContext(ctx, fmt.Sprintf("processed ok the item with the id: %s", id))
 			// worked, no need to send with the next mx address
 			return nil
 		} else {
