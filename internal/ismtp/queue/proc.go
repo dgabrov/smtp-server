@@ -49,7 +49,6 @@ func ProcItem(ctx context.Context, from string, to string, message *string, tlsC
 		id := uuid.NewString()
 		slog.InfoContext(ctx, fmt.Sprintf("id: %s delivering from %s to %s, with mx: %s", id, from, to, deliveryAddress))
 
-		// TODO just after this point, process the dkim with the provided parameters if needed
 		if dkimEnabled && message != nil {
 			slog.InfoContext(ctx, fmt.Sprintf("processing enabled dkim for id: %s", id))
 			signed, err := signMessage([]byte(*message), dkimKey, localDomain, dkimSelector)

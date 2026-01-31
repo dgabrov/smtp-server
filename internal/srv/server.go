@@ -25,6 +25,7 @@ type Servr interface {
 	AddQueueItemError(ctx context.Context, queueItemID string) error
 	LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueue, error)
 	LoadQueueRecipients(ctx context.Context, config data.QueueConfig) ([]*data.DmQueueRecipient, error)
+	GetUserID(ctx context.Context, email string) (string, error)
 }
 
 func NewServer(db *sql.DB) Servr {
@@ -33,6 +34,31 @@ func NewServer(db *sql.DB) Servr {
 
 type server struct {
 	db *sql.DB
+}
+
+func (s *server) GetUserID(ctx context.Context, email string) (string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	login, domain, err := getLoginAndDomain(email)
+	if err != nil {
+		return "", err
+	}
+
+	userID, err := getUserID(ctx, tx, login, domain)
+	if err != nil {
+		return "", err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", err
+	}
+
+	return userID, nil
 }
 
 func (s *server) LoadQueueRecipients(ctx context.Context, config data.QueueConfig) ([]*data.DmQueueRecipient, error) {
@@ -171,6 +197,39 @@ func getNrAttempts(ctx context.Context, tx *sql.Tx, id string) (int, error) {
 	return nr, nil
 }
 
+func getNextUid(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
+	qr := "select max(uid) from mailbox where mailbox_id = ?"
+	var res uint32
+	res = 1
+
+	st, err := tx.PrepareContext(ctx, qr)
+	if err != nil {
+		return 0, err
+	}
+	defer st.Close()
+
+	rows, err := st.QueryContext(ctx, mailboxID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var pulledVal sql.NullInt32
+
+	if rows.Next() {
+		err := rows.Scan(&pulledVal)
+		if err != nil {
+			return 0, err
+		}
+
+		if pulledVal.Valid {
+			res = uint32(pulledVal.Int32) + 1
+		}
+	}
+
+	return res, nil
+}
+
 func (s *server) DeliverLocally(context context.Context, to string, body []byte) error {
 	tx := getTx(context, s.db)
 	defer tx.Rollback()
@@ -194,10 +253,15 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte)
 		return errors.New("mailbox not found")
 	}
 
+	uid, err := getNextUid(context, tx, mailboxID)
+	if err != nil {
+		return err
+	}
+
 	messageID := uuid.NewString()
 
-	qr := "insert into message (message_id, mailbox_id, body) values (?, ?, ?)"
-	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body)
+	qr := "insert into message (message_id, mailbox_id, body, uid, created_date) values (?, ?, ?, ?, ?)"
+	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body, uid, time.Now().UTC())
 	if err != nil {
 		return err
 	}

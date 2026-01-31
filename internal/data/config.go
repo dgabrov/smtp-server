@@ -50,6 +50,7 @@ type ConfigData struct {
 		Compress   bool
 		MaxBackups int
 	}
+
 	Queue QueueConfig
 }
 

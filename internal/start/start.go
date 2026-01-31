@@ -14,11 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgb9/smtp-server/internal/queue"
+	"github.com/dgb9/smtp-server/internal/imp"
+	"github.com/dgb9/smtp-server/internal/ismtp/bck"
+	"github.com/dgb9/smtp-server/internal/ismtp/queue"
 	"github.com/dgb9/smtp-server/internal/srv"
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/dgb9/smtp-server/internal/bck"
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-smtp"
 )
@@ -60,7 +61,7 @@ func Start() error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(2) // 25 is open no matter what and the loader is also processing
+	wg.Add(3) // 25 is open no matter what and the loader is also processing and ultimately imap as well
 	if config.Enabled587 {
 		wg.Add(1) // if enabled 587, add another one as well
 	}
@@ -84,6 +85,9 @@ func Start() error {
 	}
 
 	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain, dkimConfig, key)
+
+	// start the imap server
+	go imp.StartImap(config, &wg, tlsConfig, server)
 
 	wg.Wait()
 
