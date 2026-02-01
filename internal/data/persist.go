@@ -1,6 +1,10 @@
 package data
 
-import "time"
+import (
+	"time"
+
+	"github.com/emersion/go-imap/v2"
+)
 
 type DmDomain struct {
 	DomainID      string
@@ -10,9 +14,18 @@ type DmDomain struct {
 }
 
 type DmMailbox struct {
-	MailboxID string
-	UserID    string
-	Name      string
+	MailboxID  string
+	UserID     string
+	Name       string
+	Attributes []imap.MailboxAttr
+}
+
+type DmMailboxStatus struct {
+	NumMessages       uint32
+	FirstUnseenSeqNum uint32
+	NumRecent         uint32
+	UIDNext           uint32
+	UIDValidity       uint32
 }
 
 type DmUser struct {

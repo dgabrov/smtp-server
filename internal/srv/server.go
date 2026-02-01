@@ -26,6 +26,9 @@ type Servr interface {
 	LoadQueueItemByID(ctx context.Context, id string) (*data.DmQueue, error)
 	LoadQueueRecipients(ctx context.Context, config data.QueueConfig) ([]*data.DmQueueRecipient, error)
 	GetUserID(ctx context.Context, email string) (string, error)
+	GetMailboxByName(ctx context.Context, userID string, name string) (*data.DmMailbox, error)
+	GetMailboxStatus(ctx context.Context, mailboxID string) (*data.DmMailboxStatus, error)
+	GetMessageCount(ctx context.Context, mailboxID string) (uint32, error)
 }
 
 func NewServer(db *sql.DB) Servr {
@@ -195,39 +198,6 @@ func getNrAttempts(ctx context.Context, tx *sql.Tx, id string) (int, error) {
 	}
 
 	return nr, nil
-}
-
-func getNextUid(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
-	qr := "select max(uid) from mailbox where mailbox_id = ?"
-	var res uint32
-	res = 1
-
-	st, err := tx.PrepareContext(ctx, qr)
-	if err != nil {
-		return 0, err
-	}
-	defer st.Close()
-
-	rows, err := st.QueryContext(ctx, mailboxID)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-
-	var pulledVal sql.NullInt32
-
-	if rows.Next() {
-		err := rows.Scan(&pulledVal)
-		if err != nil {
-			return 0, err
-		}
-
-		if pulledVal.Valid {
-			res = uint32(pulledVal.Int32) + 1
-		}
-	}
-
-	return res, nil
 }
 
 func (s *server) DeliverLocally(context context.Context, to string, body []byte) error {
