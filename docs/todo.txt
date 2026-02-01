@@ -6,8 +6,6 @@ aws ecr get-login-password --region us-east-2 --profile docker | docker login --
 - 25 should not require starttls, however 587 must
 - deliver messages
 
---- todo list for the message routing
-
 -- see again how you do it to ensure the select with timeout
 --
 

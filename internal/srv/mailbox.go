@@ -3,6 +3,7 @@ package srv
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/dgb9/smtp-server/internal/data"
@@ -248,4 +249,27 @@ func (s *server) GetMessageCount(ctx context.Context, mailboxID string) (uint32,
 	}
 
 	return number, nil
+}
+
+func (s *server) GetChildMailboxes(ctx context.Context, userID string, mailboxID string) ([]*data.DmMailbox, error) {
+	// first load the first one
+	mbox, err := s.GetMailboxByName(ctx, userID, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if mbox == nil {
+		return nil, fmt.Errorf("mailbox id: %s not found", mailboxID)
+	}
+
+	// ok, get the name and proceed
+	startWith := mbox.Name + data.MailboxSeparator
+
+	return getMailboxesNameStartWith(ctx, userID, mailboxID, startWith)
+}
+
+// the idea is that the other mailboxes must be different than the existent one
+func getMailboxesNameStartWith(ctx context.Context, userID string, mailboxID string, startWith string) ([]*data.DmMailbox, error) {
+	// TODO continue here
+	return nil, nil
 }

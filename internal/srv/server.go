@@ -29,6 +29,7 @@ type Servr interface {
 	GetMailboxByName(ctx context.Context, userID string, name string) (*data.DmMailbox, error)
 	GetMailboxStatus(ctx context.Context, mailboxID string) (*data.DmMailboxStatus, error)
 	GetMessageCount(ctx context.Context, mailboxID string) (uint32, error)
+	GetChildMailboxes(ctx context.Context, userID string, mailboxID string) ([]*data.DmMailbox, error)
 }
 
 func NewServer(db *sql.DB) Servr {
