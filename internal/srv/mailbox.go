@@ -18,7 +18,7 @@ func (s *server) GetMailboxByName(ctx context.Context, userId string, name strin
 	defer tx.Rollback()
 	var res *data.DmMailbox
 
-	qr := `select mailbox_id,
+	qr := `select 
 			   mailbox_id,
 			   user_id,
 			   name,
@@ -72,24 +72,25 @@ func loadMailbox(rs *sql.Rows) (*data.DmMailbox, error) {
 	var flagNoSelect string
 	var flagMarked string
 	var flagArchive, flagDraft string
-	var flagJunk, flagSent, flagTrash, flagImportant string
+	var flagFlagged, flagJunk, flagSent, flagTrash, flagImportant string
 
-	err := rs.Scan(&mailboxID, &userID, &name, &flagNonExistent, &flagNoInferiors, &flagNoSelect, &flagMarked, &flagArchive, &flagDraft, &flagJunk, &flagSent, &flagTrash, &flagImportant)
+	err := rs.Scan(&mailboxID, &userID, &name, &flagNonExistent, &flagNoInferiors, &flagNoSelect, &flagMarked, &flagArchive, &flagDraft, &flagFlagged, &flagJunk, &flagSent, &flagTrash, &flagImportant)
 	if err != nil {
 		return nil, err
 	}
 
 	var flags []imap.MailboxAttr
-	flags = processFlag(flags, flagNonExistent, imap.MailboxAttrNonExistent)
-	flags = processFlag(flags, flagNoInferiors, imap.MailboxAttrNoInferiors)
-	flags = processFlag(flags, flagNoSelect, imap.MailboxAttrNoSelect)
-	flags = processFlag(flags, flagMarked, imap.MailboxAttrMarked)
-	flags = processFlag(flags, flagArchive, imap.MailboxAttrArchive)
-	flags = processFlag(flags, flagDraft, imap.MailboxAttrDrafts)
-	flags = processFlag(flags, flagJunk, imap.MailboxAttrJunk)
-	flags = processFlag(flags, flagSent, imap.MailboxAttrSent)
-	flags = processFlag(flags, flagTrash, imap.MailboxAttrTrash)
-	flags = processFlag(flags, flagImportant, imap.MailboxAttrImportant)
+	flags = processMailboxFlag(flags, flagNonExistent, imap.MailboxAttrNonExistent)
+	flags = processMailboxFlag(flags, flagNoInferiors, imap.MailboxAttrNoInferiors)
+	flags = processMailboxFlag(flags, flagNoSelect, imap.MailboxAttrNoSelect)
+	flags = processMailboxFlag(flags, flagMarked, imap.MailboxAttrMarked)
+	flags = processMailboxFlag(flags, flagArchive, imap.MailboxAttrArchive)
+	flags = processMailboxFlag(flags, flagDraft, imap.MailboxAttrDrafts)
+	flags = processMailboxFlag(flags, flagFlagged, imap.MailboxAttrFlagged)
+	flags = processMailboxFlag(flags, flagJunk, imap.MailboxAttrJunk)
+	flags = processMailboxFlag(flags, flagSent, imap.MailboxAttrSent)
+	flags = processMailboxFlag(flags, flagTrash, imap.MailboxAttrTrash)
+	flags = processMailboxFlag(flags, flagImportant, imap.MailboxAttrImportant)
 
 	return &data.DmMailbox{
 		MailboxID:  mailboxID,
@@ -99,7 +100,7 @@ func loadMailbox(rs *sql.Rows) (*data.DmMailbox, error) {
 	}, nil
 }
 
-func processFlag(flags []imap.MailboxAttr, strVal string, attribute imap.MailboxAttr) []imap.MailboxAttr {
+func processMailboxFlag(flags []imap.MailboxAttr, strVal string, attribute imap.MailboxAttr) []imap.MailboxAttr {
 	if strings.ToUpper(strVal) == "Y" {
 		return append(flags, attribute)
 	}
@@ -119,7 +120,7 @@ func (s *server) GetMailboxStatus(ctx context.Context, mailboxID string) (*data.
 		return nil, err
 	}
 
-	numRecent, err := getNumRecent(ctx, tx, mailboxID)
+	numRecent, err := getNumUnseen(ctx, tx, mailboxID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +131,14 @@ func (s *server) GetMailboxStatus(ctx context.Context, mailboxID string) (*data.
 	}
 
 	firstUnseenSeqNum, err := getFirstUnseenSeqNum(ctx, tx, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	numDeleted, err := getNumDeleted(ctx, tx, mailboxID)
+	if err != nil {
+		return nil, err
+	}
 
 	err = tx.Commit()
 	if err != nil {
@@ -142,7 +151,42 @@ func (s *server) GetMailboxStatus(ctx context.Context, mailboxID string) (*data.
 		NumRecent:         numRecent,
 		UIDNext:           uidNext,
 		UIDValidity:       data.UIDValidity,
+		NumDeleted:        numDeleted,
+		NumUnseen:         numRecent,
 	}, nil
+}
+
+func getNumUnseen(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
+	rs, err := tx.QueryContext(ctx, "select count(*) from message where mailbox_id = ? and flag_seen = 'N'", mailboxID)
+	if err != nil {
+		return 0, err
+	}
+	defer rs.Close()
+
+	var val uint32
+	rs.Next()
+	err = rs.Scan(&val)
+	if err != nil {
+		return 0, err
+	}
+
+	return val, nil
+}
+
+func getNumDeleted(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
+	rs, err := tx.QueryContext(ctx, "select count(*) from message where mailbox_id = ? and flag_deleted = 'Y'", mailboxID)
+	if err != nil {
+		return 0, err
+	}
+
+	var val uint32
+	rs.Next()
+	err = rs.Scan(&val)
+	if err != nil {
+		return 0, err
+	}
+
+	return val, nil
 }
 
 func getNumMessages(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
@@ -153,6 +197,7 @@ func getNumMessages(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, 
 	defer rs.Close()
 
 	var val uint32
+	rs.Next()
 	err = rs.Scan(&val)
 	if err != nil {
 		return 0, err
@@ -177,23 +222,6 @@ func getFirstUnseenSeqNum(ctx context.Context, tx *sql.Tx, mailboxID string) (ui
 		if err != nil {
 			return 0, err
 		}
-	}
-
-	return val, nil
-}
-
-func getNumRecent(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
-	rs, err := tx.QueryContext(ctx, "SELECT count(*) FROM message WHERE mailbox_id = ? and flag_seen != 'Y'", mailboxID)
-	if err != nil {
-		return 0, err
-	}
-	defer rs.Close()
-
-	var val uint32
-	err = rs.Scan(&val)
-
-	if err != nil {
-		return 0, err
 	}
 
 	return val, nil
@@ -265,11 +293,122 @@ func (s *server) GetChildMailboxes(ctx context.Context, userID string, mailboxID
 	// ok, get the name and proceed
 	startWith := mbox.Name + data.MailboxSeparator
 
-	return getMailboxesNameStartWith(ctx, userID, mailboxID, startWith)
+	return s.GetMailboxesNameStartWith(ctx, userID, mailboxID, startWith)
 }
 
-// the idea is that the other mailboxes must be different than the existent one
-func getMailboxesNameStartWith(ctx context.Context, userID string, mailboxID string, startWith string) ([]*data.DmMailbox, error) {
-	// TODO continue here
-	return nil, nil
+func (s *server) GetMailboxesNameStartWith(ctx context.Context, userID string, mailboxID string, startWith string) ([]*data.DmMailbox, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	qr := `select mailbox_id,
+				   mailbox_id,
+				   user_id,
+				   name,
+				   flag_non_existent,
+				   flag_no_inferiors,
+				   flag_no_select,
+				   flag_marked,
+				   flag_archive,
+				   flag_drafts,
+				   flag_flagged,
+				   flag_junk,
+				   flag_sent,
+				   flag_trash,
+				   flag_important
+			from mailbox
+			where user_id = ?
+			  and mailbox_id != ?
+			  and name like ?`
+
+	rs, err := tx.QueryContext(ctx, qr, userID, mailboxID, startWith)
+	if err != nil {
+		return nil, err
+	}
+	defer rs.Close()
+	var res []*data.DmMailbox
+
+	for rs.Next() {
+		mbox, err := loadMailbox(rs)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, mbox)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (s *server) CreateMailbox(ctx context.Context, userID string, newMailboxID string, mailbox string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	qr := "insert into mailbox (mailbox_id, user_id, name) values (?, ?, ?)"
+	_, err = tx.ExecContext(ctx, qr, newMailboxID, userID, mailbox)
+
+	return tx.Commit()
+}
+
+func (s *server) UpdateMailboxName(ctx context.Context, userID string, mailboxID string, name string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, "update mailbox set name = ? where mailbox_id = ? and user_id = ?", name, mailboxID, userID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *server) ListMailboxes(ctx context.Context, userID string) ([]*data.DmMailbox, error) {
+	qr := `select 
+				   mailbox_id,
+				   user_id,
+				   name,
+				   flag_non_existent,
+				   flag_no_inferiors,
+				   flag_no_select,
+				   flag_marked,
+				   flag_archive,
+				   flag_drafts,
+				   flag_flagged,
+				   flag_junk,
+				   flag_sent,
+				   flag_trash,
+				   flag_important
+			from mailbox
+			where user_id = ? order by name`
+
+	rs, err := s.db.QueryContext(ctx, qr, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rs.Close()
+
+	var res []*data.DmMailbox
+	for rs.Next() {
+		mbox, err := loadMailbox(rs)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, mbox)
+	}
+
+	return res, nil
 }

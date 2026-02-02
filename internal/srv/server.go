@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
+	"github.com/emersion/go-imap/v2"
 	"github.com/google/uuid"
 )
 
@@ -30,6 +31,17 @@ type Servr interface {
 	GetMailboxStatus(ctx context.Context, mailboxID string) (*data.DmMailboxStatus, error)
 	GetMessageCount(ctx context.Context, mailboxID string) (uint32, error)
 	GetChildMailboxes(ctx context.Context, userID string, mailboxID string) ([]*data.DmMailbox, error)
+	ListMailboxes(ctx context.Context, userID string) ([]*data.DmMailbox, error)
+	GetMailboxesNameStartWith(ctx context.Context, userID string, mailboxID string, startWith string) ([]*data.DmMailbox, error)
+	CreateMailbox(ctx context.Context, userID string, newMailboxID string, mailbox string) error
+	GetExpungeInformation(ctx context.Context, uids *imap.UIDSet, mailboxID string) ([]*data.SeqHolder, error)
+	DeleteMessage(ctx context.Context, mailboxID string, messageID string) error
+	UpdateMailboxName(ctx context.Context, userID string, mailboxID string, name string) error
+	AppendMessage(ctx context.Context, mailboxID string, body []byte, flags []imap.Flag, t time.Time) (imap.UID, error)
+	GetFilteredPositionalData(ctx context.Context, mailboxID string, set imap.NumSet) ([]*data.DmPositionalMessage, error)
+	SetMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
+	DeleteMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
+	AddMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
 }
 
 func NewServer(db *sql.DB) Servr {

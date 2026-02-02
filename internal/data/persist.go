@@ -26,6 +26,8 @@ type DmMailboxStatus struct {
 	NumRecent         uint32
 	UIDNext           uint32
 	UIDValidity       uint32
+	NumDeleted        uint32
+	NumUnseen         uint32
 }
 
 type DmUser struct {
@@ -39,6 +41,27 @@ type DmMessage struct {
 	MessageID string
 	MailboxID string
 	Body      string
+	Flags     []imap.Flag
+}
+
+type DmStrippedMessage struct {
+	MessageID string
+	MailboxID string
+	UID       uint32
+	SeqNum    uint32
+	Flags     []imap.Flag
+}
+
+type DmPositionalMessage struct {
+	MessageID string
+	UID       imap.UID
+	SeqNum    uint32
+}
+
+type SeqHolder struct {
+	ID     string
+	UID    uint32
+	NumSeq uint32
 }
 
 type DmQueue struct {

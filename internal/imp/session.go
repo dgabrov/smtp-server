@@ -1,9 +1,14 @@
 package imp
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
@@ -99,18 +104,102 @@ func (s *session) Select(mailbox string, options *imap.SelectOptions) (*imap.Sel
 }
 
 func (s *session) Create(mailbox string, options *imap.CreateOptions) error {
-	//TODO implement me
-	panic("implement me")
+	// create only leaf mailboxes, if parents do not exist, will not create them automatically
+	// also check if the mailbox exists
+
+	mbox, err := s.srvr.GetMailboxByName(s.ctx, s.userID, mailbox)
+	if err != nil {
+		return err
+	}
+
+	if mbox != nil {
+		return fmt.Errorf("mailbox already exists: %s", mailbox)
+	}
+
+	// get parent names
+	items := strings.Split(mailbox, data.MailboxSeparator)
+	nr := len(items)
+	if nr > 1 { // if there are parent mailboxes
+		nr = nr - 1
+
+		for i := 0; i < nr; i++ {
+			slc := items[0:i]
+
+			parentName := strings.Join(slc, data.MailboxSeparator)
+			parentMailbox, err := s.srvr.GetMailboxByName(s.ctx, s.userID, parentName)
+			if err != nil {
+				return err
+			}
+
+			if parentMailbox == nil {
+				return fmt.Errorf("parent mailbox not found: %s", parentName)
+			}
+		}
+	}
+
+	// ok, all the parent mailboxes are accounted for, create the mailbox now
+	newMailboxID := uuid.NewString()
+	return s.srvr.CreateMailbox(s.ctx, s.userID, newMailboxID, mailbox)
 }
 
 func (s *session) Delete(mailbox string) error {
-	//TODO implement me
-	panic("implement me")
+	mbox, err := s.srvr.GetMailboxByName(s.ctx, s.userID, mailbox)
+	if err != nil {
+		return err
+	}
+
+	if mbox == nil {
+		slog.Info(fmt.Sprintf("mailbox not found: %s, so nothing to delete here", mailbox))
+		return nil
+	}
+
+	subMailbox, err := s.srvr.GetChildMailboxes(s.ctx, s.userID, mbox.MailboxID)
+	if err != nil {
+		return err
+	}
+
+	if len(subMailbox) > 0 {
+		return errors.New("cannot delete mailbox because it has child mailboxes")
+	}
+
+	return nil
 }
 
 func (s *session) Rename(mailbox, newName string, options *imap.RenameOptions) error {
-	//TODO implement me
-	panic("implement me")
+	serv := s.srvr
+	mbox, err := serv.GetMailboxByName(s.ctx, s.userID, mailbox)
+	if err != nil {
+		return err
+	}
+
+	if mbox == nil {
+		return fmt.Errorf("mailbox not found: %s", mailbox)
+	}
+
+	// gather the child mailboxes, they need to have name modified as well
+	childMailboxes, err := serv.GetChildMailboxes(s.ctx, s.userID, mbox.MailboxID)
+	if err != nil {
+		return err
+	}
+
+	err = serv.UpdateMailboxName(s.ctx, s.userID, mbox.MailboxID, newName)
+	if err != nil {
+		return err
+	}
+
+	for _, childMailbox := range childMailboxes {
+		// the mailbox name will have the first characters replaced with the new one
+		currentName := childMailbox.Name
+		ln := len(mailbox)
+		newChildName := newName + currentName[ln:]
+
+		err = serv.UpdateMailboxName(s.ctx, s.userID, mbox.MailboxID, newChildName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *session) Subscribe(mailbox string) error {
@@ -126,19 +215,77 @@ func (s *session) Unsubscribe(mailbox string) error {
 }
 
 func (s *session) List(w *imapserver.ListWriter, ref string, patterns []string, options *imap.ListOptions) error {
+	list, err := s.srvr.ListMailboxes(s.ctx, s.userID)
+	if err != nil {
+		return err
+	}
 
-	//TODO implement me -- always return \Subscribed flag!!!
-	panic("implement me")
+	for _, mailbox := range list {
+		data := imap.ListData{
+			Attrs:   mailbox.Attributes,
+			Delim:   data.MailboxSeparatorRune,
+			Mailbox: mailbox.Name,
+		}
+
+		if !slices.Contains(data.Attrs, imap.MailboxAttrSubscribed) {
+			data.Attrs = append(data.Attrs, imap.MailboxAttrSubscribed)
+		}
+
+		err = w.WriteList(&data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *session) Status(mailbox string, options *imap.StatusOptions) (*imap.StatusData, error) {
-	//TODO implement me
-	panic("implement me")
+	servr := s.srvr
+	mbox, err := servr.GetMailboxByName(s.ctx, s.userID, mailbox)
+	if err != nil {
+		return nil, err
+	}
+
+	mailboxID := mbox.MailboxID
+
+	status, err := servr.GetMailboxStatus(s.ctx, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &imap.StatusData{
+		Mailbox:     mailbox,
+		NumMessages: &status.NumMessages,
+		UIDNext:     imap.UID(status.UIDNext),
+		UIDValidity: data.UIDValidity,
+		NumUnseen:   &status.NumUnseen,
+		NumDeleted:  &status.NumDeleted,
+	}, nil
 }
 
 func (s *session) Append(mailbox string, r imap.LiteralReader, options *imap.AppendOptions) (*imap.AppendData, error) {
-	//TODO implement me
-	panic("implement me")
+	mbox, err := s.srvr.GetMailboxByName(s.ctx, s.userID, mailbox)
+	if err != nil {
+		return nil, err
+	}
+
+	mailboxID := mbox.MailboxID
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	uid, err := s.srvr.AppendMessage(s.ctx, mailboxID, body, options.Flags, options.Time)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &imap.AppendData{
+		UID:         uid,
+		UIDValidity: data.UIDValidity,
+	}, nil
 }
 
 func (s *session) Poll(w *imapserver.UpdateWriter, allowExpunge bool) error {
@@ -194,26 +341,94 @@ func (s *session) Unselect() error {
 }
 
 func (s *session) Expunge(w *imapserver.ExpungeWriter, uids *imap.UIDSet) error {
-	//TODO implement me
-	panic("implement me")
+	if s.selected == nil {
+		slog.Info("no mailbox selected, we cannot expunge")
+
+		return nil
+	}
+
+	seqHolders, err := s.srvr.GetExpungeInformation(s.ctx, uids, s.selected.MailboxID)
+	if err != nil {
+		return err
+	}
+
+	// and now for each of it delete it and then pass the number, but make sure you operate from maximum to minimum
+	slices.SortFunc(seqHolders, func(first *data.SeqHolder, second *data.SeqHolder) int {
+		return cmp.Compare(second.NumSeq, first.NumSeq)
+	})
+
+	for _, seqHolder := range seqHolders {
+		numSeq := seqHolder.NumSeq
+		id := seqHolder.ID
+
+		err := s.srvr.DeleteMessage(s.ctx, s.selected.MailboxID, id)
+		if err != nil {
+			return err
+		}
+
+		err = w.WriteExpunge(numSeq)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *session) Search(kind imapserver.NumKind, criteria *imap.SearchCriteria, options *imap.SearchOptions) (*imap.SearchData, error) {
-	//TODO implement me
-	panic("implement me")
+	// TODO
+	return nil, errors.New("search not implemented")
 }
 
 func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
-	//TODO implement me
-	panic("implement me")
+	// TODO
+	return errors.New("fetch not implemented")
 }
 
 func (s *session) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *imap.StoreFlags, options *imap.StoreOptions) error {
-	//TODO implement me
-	panic("implement me")
-}
+	if s.selected == nil {
+		return nil
+	}
 
-func (s *session) Copy(numSet imap.NumSet, dest string) (*imap.CopyData, error) {
-	//TODO implement me
-	panic("implement me")
+	items, err := s.srvr.GetFilteredPositionalData(s.ctx, s.selected.MailboxID, numSet)
+	if err != nil {
+		return err
+	}
+
+	var newFlags []imap.Flag
+
+	for _, item := range items {
+		switch flags.Op {
+		case imap.StoreFlagsSet:
+			newFlags, err = s.srvr.SetMessageFlags(s.ctx, item.MessageID, flags.Flags)
+
+			if err != nil {
+				return err
+			}
+		case imap.StoreFlagsDel:
+			newFlags, err = s.srvr.DeleteMessageFlags(s.ctx, item.MessageID, flags.Flags)
+
+			if err != nil {
+				return err
+			}
+		case imap.StoreFlagsAdd:
+			newFlags, err = s.srvr.AddMessageFlags(s.ctx, item.MessageID, flags.Flags)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		// proceed
+		responseWriter := w.CreateMessage(item.SeqNum)
+		responseWriter.WriteFlags(newFlags)
+		responseWriter.WriteUID(item.UID)
+
+		err = responseWriter.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

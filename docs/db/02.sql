@@ -22,3 +22,7 @@ alter table mailbox add flag_junk varchar(1) not null default 'N';
 alter table mailbox add flag_sent varchar(1) not null default 'N';
 alter table mailbox add flag_trash varchar(1) not null default 'N';
 alter table mailbox add flag_important varchar(1) not null default 'N';
+
+alter table mailbox drop column flag_inbox;
+alter table message modify body longblob null;
+
