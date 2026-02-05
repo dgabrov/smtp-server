@@ -12,14 +12,17 @@ func (s *session) Copy(numSet imap.NumSet, dest string) (*imap.CopyData, error) 
 		}, nil
 	}
 
-	var sourceUids []imap.UID
-	var destinationUids []imap.UID
+// 	var sourceUids []imap.UID
+// 	var destinationUids []imap.UID
 
-	mailboxID := s.selected.MailboxID
+// 	_ := s.selected.MailboxID
 
-	return &imap.CopyData{
-		UIDValidity: data.UIDValidity,
-		SourceUIDs:  sourceUids,
-		DestUIDs:    destinationUids,
-	}, nil
+	// TODO this is not at all implemented...
+
+// 	return &imap.CopyData{
+// 		UIDValidity: data.UIDValidity,
+// 		SourceUIDs:  sourceUids,
+// 		DestUIDs:    destinationUids,
+// 	}, nil
+    return nil, nil
 }

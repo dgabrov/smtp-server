@@ -380,11 +380,6 @@ func (s *session) Search(kind imapserver.NumKind, criteria *imap.SearchCriteria,
 	return nil, errors.New("search not implemented")
 }
 
-func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
-	// TODO
-	return errors.New("fetch not implemented")
-}
-
 func (s *session) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *imap.StoreFlags, options *imap.StoreOptions) error {
 	if s.selected == nil {
 		return nil
