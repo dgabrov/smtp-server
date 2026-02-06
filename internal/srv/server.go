@@ -42,6 +42,7 @@ type Servr interface {
 	SetMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
 	DeleteMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
 	AddMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
+	CopyMessages(ctx context.Context, set imap.NumSet, sourceMailboxID string, destinationMailboxID string) (*imap.CopyData, error)
 }
 
 func NewServer(db *sql.DB) Servr {

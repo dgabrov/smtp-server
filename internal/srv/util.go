@@ -6,7 +6,7 @@ import (
 	"github.com/emersion/go-imap/v2"
 )
 
-func dealWithWildcards(numSet imap.NumSet, getNextItemNumSet func() (uint32, error), getNextItemUid func() (imap.UID, error)) error {
+func dealWithWildcards(numSet imap.NumSet, getMailboxMessageCount func() (uint32, error), getNextItemUid func() (imap.UID, error)) error {
 	if numSet == nil {
 		return nil
 	}
@@ -21,11 +21,11 @@ func dealWithWildcards(numSet imap.NumSet, getNextItemNumSet func() (uint32, err
 			for i := 0; i < ln; i++ {
 				if seqSet[i].Stop == 0 {
 					if nextItem == 0 {
-						if getNextItemNumSet == nil {
-							return errors.New("getNextItemNumSet is nil")
+						if getMailboxMessageCount == nil {
+							return errors.New("getMailboxMessageCount is nil")
 						}
 
-						nextItem, err = getNextItemNumSet()
+						nextItem, err = getMailboxMessageCount()
 
 						if err != nil {
 							return err

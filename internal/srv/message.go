@@ -181,7 +181,7 @@ func (s *server) GetFilteredPositionalData(ctx context.Context, mailboxID string
 
 	// ok now filter the values
 	err = dealWithWildcards(set, func() (uint32, error) {
-		return getNumMessages(ctx, tx, mailboxID)
+		return getCountMessages(ctx, tx, mailboxID)
 	}, func() (imap.UID, error) {
 		uid, err := getNextUid(ctx, tx, mailboxID)
 		if err != nil {

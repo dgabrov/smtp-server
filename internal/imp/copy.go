@@ -1,6 +1,8 @@
 package imp
 
 import (
+	"fmt"
+
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-imap/v2"
 )
@@ -12,17 +14,17 @@ func (s *session) Copy(numSet imap.NumSet, dest string) (*imap.CopyData, error) 
 		}, nil
 	}
 
-// 	var sourceUids []imap.UID
-// 	var destinationUids []imap.UID
+	mbox, err := s.srvr.GetMailboxByName(s.ctx, s.userID, dest)
+	if err != nil {
+		return nil, err
+	}
 
-// 	_ := s.selected.MailboxID
+	if mbox == nil {
+		return nil, fmt.Errorf("mailbox %s not found", dest)
+	}
 
-	// TODO this is not at all implemented...
+	// found mailbox, continue
+	copyData, err := s.srvr.CopyMessages(s.ctx, numSet, s.selected.MailboxID, mbox.MailboxID)
 
-// 	return &imap.CopyData{
-// 		UIDValidity: data.UIDValidity,
-// 		SourceUIDs:  sourceUids,
-// 		DestUIDs:    destinationUids,
-// 	}, nil
-    return nil, nil
+	return copyData, err
 }

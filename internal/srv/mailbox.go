@@ -115,7 +115,7 @@ func (s *server) GetMailboxStatus(ctx context.Context, mailboxID string) (*data.
 	}
 	defer tx.Rollback()
 
-	numMessages, err := getNumMessages(ctx, tx, mailboxID)
+	numMessages, err := getCountMessages(ctx, tx, mailboxID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func getNumDeleted(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, e
 	return val, nil
 }
 
-func getNumMessages(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
+func getCountMessages(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
 	rs, err := tx.QueryContext(ctx, "SELECT count(*) FROM message WHERE mailbox_id = ?", mailboxID)
 	if err != nil {
 		return 0, err
@@ -266,7 +266,7 @@ func (s *server) GetMessageCount(ctx context.Context, mailboxID string) (uint32,
 		return 0, err
 	}
 	defer tx.Rollback()
-	number, err := getNumMessages(ctx, tx, mailboxID)
+	number, err := getCountMessages(ctx, tx, mailboxID)
 	if err != nil {
 		return 0, err
 	}
