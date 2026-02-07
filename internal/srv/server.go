@@ -43,6 +43,9 @@ type Servr interface {
 	DeleteMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
 	AddMessageFlags(ctx context.Context, messageID string, flags []imap.Flag) ([]imap.Flag, error)
 	CopyMessages(ctx context.Context, set imap.NumSet, sourceMailboxID string, destinationMailboxID string) (*imap.CopyData, error)
+	GetMessageBody(ctx context.Context, messageID string) ([]byte, error)
+	GetStrippedMessages(ctx context.Context, numset imap.NumSet, mailboxID string) ([]*data.DmStrippedMessage, error)
+	SearchMessages(ctx context.Context, mailboxID string, search string) ([]uint32, []imap.UID, error)
 }
 
 func NewServer(db *sql.DB) Servr {

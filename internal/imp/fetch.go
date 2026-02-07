@@ -3,34 +3,41 @@ package imp
 import (
 	"bufio"
 	"bytes"
-	"time"
+	"errors"
+	"io"
 
+	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/emersion/go-message/textproto"
 )
 
 func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
-	messages, err := getMessageData(numSet)
+	if s.selected == nil {
+		return errors.New("there is no mailbox selected, not sure why fetch was invoked")
+	}
+
+	messages, err := s.srvr.GetStrippedMessages(s.ctx, numSet, s.selected.MailboxID)
 	if err != nil {
 		return err
 	}
 
 	for _, msg := range messages {
-		err = processMessage(w, msg, options)
+		messageID := msg.MessageID
+		messageBody, err := s.srvr.GetMessageBody(s.ctx, messageID)
+		err = processMessage(w, *msg, messageBody, options)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func processMessage(w *imapserver.FetchWriter, msg MessageData, options *imap.FetchOptions) error {
-	mg := w.CreateMessage(msg.NumSeq)
+func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messageBody []byte, options *imap.FetchOptions) error {
+	mg := w.CreateMessage(msg.SeqNum)
 	defer mg.Close()
-
-	messageBody, flags, err := getMessageBody(msg.MessageID)
-	if err != nil {
-		return err
-	}
 
 	bytesReader := bytes.NewReader(messageBody)
 	r := bufio.NewReader(bytesReader)
@@ -61,7 +68,7 @@ func processMessage(w *imapserver.FetchWriter, msg MessageData, options *imap.Fe
 	}
 
 	if options.Flags {
-		mg.WriteFlags(flags)
+		mg.WriteFlags(msg.Flags)
 	}
 
 	if options.BodyStructure != nil {
@@ -71,33 +78,21 @@ func processMessage(w *imapserver.FetchWriter, msg MessageData, options *imap.Fe
 
 		mg.WriteBodyStructure(bodyStructure)
 	}
-	// not nil and contianing things
-	if len(options.BodySection) > 0 {
-// 		for _, section := range options.BodySection {
-//
-// 		}
+
+	// body section - very difficult to process
+	for _, bodySection := range options.BodySection {
+		sectionBytes := imapserver.ExtractBodySection(bytes.NewReader(messageBody), bodySection)
+		ln := len(sectionBytes)
+
+		wc := mg.WriteBodySection(bodySection, int64(ln))
+		_, err = io.Copy(wc, bytes.NewReader(sectionBytes))
+
+		defer wc.Close()
+
+		if err != nil {
+			return err
+		}
 	}
 
-	// take all the values
 	return nil
-}
-
-func getMessageBody(id string) ([]byte, []imap.Flag, error) {
-	return nil, nil, nil
-}
-
-/*
-	BodySection       []*FetchItemBodySection
-*/
-
-func getMessageData(numSet imap.NumSet) ([]MessageData, error) {
-	// returns a set of items that contain this
-	return nil, nil
-}
-
-type MessageData struct {
-	MessageID    string
-	NumSeq       uint32
-	UID          imap.UID
-	InternalDate time.Time
 }

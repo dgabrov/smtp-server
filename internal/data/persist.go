@@ -45,11 +45,12 @@ type DmMessage struct {
 }
 
 type DmStrippedMessage struct {
-	MessageID string
-	MailboxID string
-	UID       uint32
-	SeqNum    uint32
-	Flags     []imap.Flag
+	MessageID    string
+	MailboxID    string
+	UID          imap.UID
+	SeqNum       uint32
+	InternalDate time.Time
+	Flags        []imap.Flag
 }
 
 type DmPositionalMessage struct {
