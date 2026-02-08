@@ -20,11 +20,11 @@ func StartImap(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config
 	}
 }
 
-func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, writer io.Writer) error {
+func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, _ io.Writer) error {
 	defer wg.Done()
 
 	backend := newBackend(tlsConfig, server)
-	backend.DebugWriter = writer
+	// backend.DebugWriter = writer
 
 	s := imapserver.New(backend) // 'nil' should be replaced with your backend
 
