@@ -46,6 +46,7 @@ type Servr interface {
 	GetMessageBody(ctx context.Context, messageID string) ([]byte, error)
 	GetStrippedMessages(ctx context.Context, numset imap.NumSet, mailboxID string) ([]*data.DmStrippedMessage, error)
 	SearchMessages(ctx context.Context, mailboxID string, search string) ([]uint32, []imap.UID, error)
+	MarkMessageAsSeen(ctx context.Context, messageID string) error
 }
 
 func NewServer(db *sql.DB) Servr {

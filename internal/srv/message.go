@@ -3,6 +3,8 @@ package srv
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -19,11 +21,10 @@ func (s *server) GetExpungeInformation(ctx context.Context, uids *imap.UIDSet, m
 	}
 	defer tx.Rollback()
 
-	qr := `select row_nr, message_id
-		from (select row_number() over (order by created_date) row_nr, message_id, uid
+	qr := `select row_number() over (order by created_date) row_nr, message_id, uid
 			  from message
 			  where flag_deleted = 'Y'
-				and mailbox_id = ?) dlt `
+				and mailbox_id = ?`
 
 	// very bad : load all of them and then filter
 	rs, err := tx.QueryContext(ctx, qr, mailboxID)
@@ -107,30 +108,30 @@ func (s *server) AppendMessage(ctx context.Context, mailboxID string, body []byt
 
 	messageID := uuid.NewString()
 	createdDate := t.UTC()
-	flagSeen := 'N'
-	flagAnswered := 'N'
-	flagFlagged := 'N'
-	flagDeleted := 'N'
-	flagDraft := 'N'
+	flagSeen := "N"
+	flagAnswered := "N"
+	flagFlagged := "N"
+	flagDeleted := "N"
+	flagDraft := "N"
 
 	if slices.Contains(flags, imap.FlagSeen) {
-		flagSeen = 'Y'
+		flagSeen = "Y"
 	}
 
 	if slices.Contains(flags, imap.FlagAnswered) {
-		flagAnswered = 'Y'
+		flagAnswered = "Y"
 	}
 
 	if slices.Contains(flags, imap.FlagFlagged) {
-		flagFlagged = 'Y'
+		flagFlagged = "Y"
 	}
 
 	if slices.Contains(flags, imap.FlagDeleted) {
-		flagDeleted = 'Y'
+		flagDeleted = "Y"
 	}
 
 	if slices.Contains(flags, imap.FlagDraft) {
-		flagDraft = 'Y'
+		flagDraft = "Y"
 	}
 
 	_, err = tx.ExecContext(ctx, `insert into message (message_id, mailbox_id, body, uid, 
@@ -353,4 +354,13 @@ func (s *server) SearchMessages(ctx context.Context, mailboxID string, search st
 	}
 
 	return resSeq, uids, nil
+}
+
+func (s *server) MarkMessageAsSeen(ctx context.Context, messageID string) error {
+	slog.Info(fmt.Sprintf("marking message as seen: %s", messageID))
+
+	qr := `UPDATE message SET flag_seen = 'Y' WHERE message_id = ?`
+	_, err := s.db.ExecContext(ctx, qr, messageID)
+
+	return err
 }

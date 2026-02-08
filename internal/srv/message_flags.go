@@ -87,7 +87,7 @@ func (s *server) AddMessageFlags(ctx context.Context, messageID string, flags []
 }
 
 func getCurrentMessageFlags(ctx context.Context, tx *sql.Tx, messageID string) ([]imap.Flag, error) {
-	qr := "select flag_seen, flag_answered, flag_flagged, flag_deleted, flag_draft from messasge where message_id = ?"
+	qr := "select flag_seen, flag_answered, flag_flagged, flag_deleted, flag_draft from message where message_id = ?"
 	rs, err := tx.QueryContext(ctx, qr, messageID)
 	if err != nil {
 		return nil, err

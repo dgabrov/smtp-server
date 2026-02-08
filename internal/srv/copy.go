@@ -24,11 +24,6 @@ func (s *server) CopyMessages(ctx context.Context, set imap.NumSet, sourceMailbo
 		return nil, err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
-	}
-
 	var starterUID []imap.UID
 	var endingUID []imap.UID
 
@@ -53,6 +48,11 @@ func (s *server) CopyMessages(ctx context.Context, set imap.NumSet, sourceMailbo
 	res.UIDValidity = data.UIDValidity
 	res.SourceUIDs = imap.UIDSetNum(starterUID...)
 	res.DestUIDs = imap.UIDSetNum(endingUID...)
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
 
 	return &res, nil
 }

@@ -26,3 +26,5 @@ alter table mailbox add flag_important varchar(1) not null default 'N';
 alter table mailbox drop column flag_inbox;
 alter table message modify body longblob null;
 
+-- add to config  this one  "imapAddress": "0.0.0.0:8993"
+

@@ -2,6 +2,7 @@ package imp
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"sync"
 
@@ -27,14 +28,14 @@ func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, se
 	defer s.Close()
 
 	// 3. Start the TLS Listener on 993
-	ln, err := tls.Listen("tcp", ":8993", tlsConfig)
+	ln, err := tls.Listen("tcp", config.ImapAddress, tlsConfig)
 	if err != nil {
-		slog.Error("Failed to listen on 8993: %v", err)
+		slog.Error(fmt.Sprintf("Failed to listen on %s: %v", config.ImapAddress, err))
 
 		return err
 	}
 
-	slog.Info("IMAP server running on :8993 (Implicit TLS)")
+	slog.Info(fmt.Sprintf("IMAP server running on %s (Implicit TLS)", config.ImapAddress))
 
 	// 4. Serve the connections
 	if err = s.Serve(ln); err != nil {

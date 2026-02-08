@@ -51,7 +51,8 @@ type ConfigData struct {
 		MaxBackups int
 	}
 
-	Queue QueueConfig
+	Queue       QueueConfig
+	ImapAddress string
 }
 
 func LoadConfig() (ConfigData, error) {

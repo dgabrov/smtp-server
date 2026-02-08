@@ -36,6 +36,7 @@
     "maxAttempts": 5,
     "timeBetweenAttempts": 100,
     "simultaneousProcessing": 2
-  }
+  },
+  "imapAddress": "0.0.0.0:8993"
 
 }

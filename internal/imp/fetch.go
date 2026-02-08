@@ -24,18 +24,27 @@ func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *
 
 	for _, msg := range messages {
 		messageID := msg.MessageID
+
 		messageBody, err := s.srvr.GetMessageBody(s.ctx, messageID)
-		err = processMessage(w, *msg, messageBody, options)
+		markSeen, err := processMessage(w, *msg, messageBody, options)
 
 		if err != nil {
 			return err
+		}
+
+		if markSeen {
+			err = s.srvr.MarkMessageAsSeen(s.ctx, messageID)
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messageBody []byte, options *imap.FetchOptions) error {
+func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messageBody []byte, options *imap.FetchOptions) (bool, error) {
 	mg := w.CreateMessage(msg.SeqNum)
 	defer mg.Close()
 
@@ -43,7 +52,7 @@ func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messa
 	r := bufio.NewReader(bytesReader)
 	header, err := textproto.ReadHeader(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if options.Envelope {
@@ -80,19 +89,25 @@ func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messa
 	}
 
 	// body section - very difficult to process
+	markSeen := false
+
 	for _, bodySection := range options.BodySection {
+		if !bodySection.Peek {
+			markSeen = true
+		}
+
 		sectionBytes := imapserver.ExtractBodySection(bytes.NewReader(messageBody), bodySection)
 		ln := len(sectionBytes)
 
 		wc := mg.WriteBodySection(bodySection, int64(ln))
 		_, err = io.Copy(wc, bytes.NewReader(sectionBytes))
 
-		defer wc.Close()
+		_ = wc.Close()
 
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
-	return nil
+	return markSeen, nil
 }
