@@ -21,10 +21,10 @@ func (s *server) GetExpungeInformation(ctx context.Context, uids *imap.UIDSet, m
 	}
 	defer tx.Rollback()
 
-	qr := `select row_number() over (order by created_date) row_nr, message_id, uid
+	qr := `select row_number() over (order by created_date, uid) row_nr, message_id, uid
 			  from message
 			  where flag_deleted = 'Y'
-				and mailbox_id = ?`
+				and mailbox_id = ? order by row_nr`
 
 	// very bad : load all of them and then filter
 	rs, err := tx.QueryContext(ctx, qr, mailboxID)
@@ -50,33 +50,9 @@ func (s *server) GetExpungeInformation(ctx context.Context, uids *imap.UIDSet, m
 		return nil, err
 	}
 
-	var results []*data.SeqHolder
-	if uids != nil {
-		err = dealWithWildcards(uids, nil, func() (imap.UID, error) {
-			val, err := getNextUid(ctx, tx, mailboxID)
-			if err != nil {
-				return 0, err
-			}
+	allItems = filterSeqHolders(allItems, uids)
 
-			return imap.UID(val - 1), nil
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		for _, seqHolder := range allItems {
-			uid := seqHolder.UID
-
-			if uids.Contains(imap.UID(uid)) {
-				results = append(results, seqHolder)
-			}
-		}
-	} else {
-		results = allItems
-	}
-
-	return results, nil
+	return allItems, nil
 }
 
 func (s *server) DeleteMessage(ctx context.Context, mailboxID string, messageID string) error {
@@ -160,7 +136,7 @@ func (s *server) GetFilteredPositionalData(ctx context.Context, mailboxID string
 
 	var res []*data.DmPositionalMessage
 
-	qr := "select row_number() over (order by created_date) row_num, message_id, uid from message where mailbox_id = ?"
+	qr := "select row_number() over (order by created_date, uid) row_num, message_id, uid from message where mailbox_id = ? order by row_num"
 	rs, err := tx.QueryContext(ctx, qr, mailboxID)
 	if err != nil {
 		return nil, err
@@ -178,53 +154,14 @@ func (s *server) GetFilteredPositionalData(ctx context.Context, mailboxID string
 	}
 
 	// ok now filter the values
-	err = dealWithWildcards(set, func() (uint32, error) {
-		return getCountMessages(ctx, tx, mailboxID)
-	}, func() (imap.UID, error) {
-		uid, err := getNextUid(ctx, tx, mailboxID)
-		if err != nil {
-			return 0, err
-		}
-
-		return imap.UID(uid - 1), nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// and now filter
-	ns, ok := set.(imap.SeqSet)
-	if ok {
-		var items []*data.DmPositionalMessage
-		for _, item := range res {
-			if ns.Contains(item.SeqNum) {
-				items = append(items, item)
-			}
-		}
-
-		return items, nil
-	}
-
-	uidSet, ok := set.(imap.UIDSet)
-	if ok {
-		var items []*data.DmPositionalMessage
-
-		for _, item := range res {
-			if uidSet.Contains(item.UID) {
-				items = append(items, item)
-			}
-		}
-
-		return items, nil
-	}
 
 	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
 
-	// just get all of them
+	res = filterPositionalMessages(res, set)
+
 	return res, nil
 }
 
@@ -257,12 +194,15 @@ func (s *server) GetStrippedMessages(ctx context.Context, nset imap.NumSet, mail
 	}
 
 	var ids []any
-	positionalMap := make(map[string]*data.DmPositionalMessage)
+	var strIds []string
+	resultMap := make(map[string]*data.DmStrippedMessage)
+	posMap := make(map[string]*data.DmPositionalMessage)
 
 	for _, m := range positional {
 		ids = append(ids, m.MessageID)
+		strIds = append(strIds, m.MessageID)
 
-		positionalMap[m.MessageID] = m
+		posMap[m.MessageID] = m
 	}
 
 	if len(positional) == 0 {
@@ -301,27 +241,35 @@ func (s *server) GetStrippedMessages(ctx context.Context, nset imap.NumSet, mail
 		flags = processMessageFlag(flags, flagDeleted, imap.FlagDeleted)
 		flags = processMessageFlag(flags, flagDraft, imap.FlagDraft)
 
-		pos, ok := positionalMap[messageID]
-		if !ok {
-			return nil, errors.New("message not found in the map, probably deleted in the meantime")
-		}
-
 		item := &data.DmStrippedMessage{
 			MessageID: messageID,
 			MailboxID: mboxID,
-			UID:       pos.UID,
-			SeqNum:    pos.SeqNum,
 			Flags:     flags,
 		}
 
-		res = append(res, item)
+		resultMap[messageID] = item
+	}
+
+	// go through them
+	for _, id := range strIds {
+		item, ok := resultMap[id]
+
+		pos, ok := posMap[id]
+		if ok {
+			item.SeqNum = pos.SeqNum
+			item.UID = pos.UID
+		}
+
+		if ok {
+			res = append(res, item)
+		}
 	}
 
 	return res, nil
 }
 
 func (s *server) SearchMessages(ctx context.Context, mailboxID string, search string) ([]uint32, []imap.UID, error) {
-	qr := "select row_number() over (order by created_date) numseq, uid from message where mailbox_id = ? and body like ?"
+	qr := "select row_number() over (order by created_date, uid) numseq, uid from message where mailbox_id = ? and body like ? order by numseq"
 
 	sr := search
 	if !strings.HasPrefix(search, "%") {

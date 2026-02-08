@@ -31,7 +31,7 @@ func Start() error {
 		return err
 	}
 
-	configureLogger(config)
+	logWriter := configureLogger(config)
 
 	data.LogConfig(config)
 
@@ -87,7 +87,7 @@ func Start() error {
 	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain, dkimConfig, key)
 
 	// start the imap server
-	go imp.StartImap(config, &wg, tlsConfig, server)
+	go imp.StartImap(config, &wg, tlsConfig, server, logWriter)
 
 	wg.Wait()
 

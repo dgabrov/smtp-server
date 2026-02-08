@@ -3,6 +3,7 @@ package imp
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 
@@ -11,18 +12,19 @@ import (
 	"github.com/emersion/go-imap/v2/imapserver"
 )
 
-func StartImap(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr) {
-	err := start(config, wg, tlsConfig, server)
+func StartImap(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, writer io.Writer) {
+	err := start(config, wg, tlsConfig, server, writer)
 
 	if err != nil {
 		slog.Error(err.Error())
 	}
 }
 
-func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr) error {
+func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, writer io.Writer) error {
 	defer wg.Done()
 
 	backend := newBackend(tlsConfig, server)
+	backend.DebugWriter = writer
 
 	s := imapserver.New(backend) // 'nil' should be replaced with your backend
 

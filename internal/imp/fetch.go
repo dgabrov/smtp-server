@@ -30,6 +30,10 @@ func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *
 		messageID := msg.MessageID
 
 		messageBody, err := s.srvr.GetMessageBody(s.ctx, messageID)
+		if err != nil {
+			return err
+		}
+
 		markSeen, err := processMessage(w, *msg, messageBody, options)
 
 		if err != nil {
@@ -50,7 +54,6 @@ func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *
 
 func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messageBody []byte, options *imap.FetchOptions) (bool, error) {
 	mg := w.CreateMessage(msg.SeqNum)
-	defer mg.Close()
 
 	bytesReader := bytes.NewReader(messageBody)
 	r := bufio.NewReader(bytesReader)
@@ -113,5 +116,5 @@ func processMessage(w *imapserver.FetchWriter, msg data.DmStrippedMessage, messa
 		}
 	}
 
-	return markSeen, nil
+	return markSeen, mg.Close()
 }

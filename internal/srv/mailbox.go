@@ -208,8 +208,8 @@ func getCountMessages(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32
 
 func getFirstUnseenSeqNum(ctx context.Context, tx *sql.Tx, mailboxID string) (uint32, error) {
 	rs, err := tx.QueryContext(ctx, `select row_num
-			from (select row_number() over (order by created_date) row_num, flag_seen from message where mailbox_id = ?) m
-			where m.flag_seen = 'N'
+			from (select row_number() over (order by created_date, uid) row_num, flag_seen from message where mailbox_id = ?) m
+			where m.flag_seen = 'N' order by row_num
 			limit 1`, mailboxID)
 	if err != nil {
 		return 0, err

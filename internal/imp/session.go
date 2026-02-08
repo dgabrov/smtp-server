@@ -86,7 +86,7 @@ func (s *session) Select(mailbox string, options *imap.SelectOptions) (*imap.Sel
 	s.selected = mbox
 	s.lastMessageCount = statusData.NumMessages
 
-	return &imap.SelectData{
+	infoRes := imap.SelectData{
 		Flags:             data.AllowedFlags,
 		PermanentFlags:    data.PermanentFlags,
 		NumMessages:       statusData.NumMessages,
@@ -100,7 +100,9 @@ func (s *session) Select(mailbox string, options *imap.SelectOptions) (*imap.Sel
 			Mailbox: mbox.Name,
 		},
 		HighestModSeq: 0,
-	}, nil
+	}
+
+	return &infoRes, nil
 }
 
 func (s *session) Create(mailbox string, options *imap.CreateOptions) error {
@@ -263,14 +265,16 @@ func (s *session) Status(mailbox string, options *imap.StatusOptions) (*imap.Sta
 		return nil, err
 	}
 
-	return &imap.StatusData{
+	statusData := imap.StatusData{
 		Mailbox:     mailbox,
 		NumMessages: &status.NumMessages,
 		UIDNext:     imap.UID(status.UIDNext),
 		UIDValidity: data.UIDValidity,
 		NumUnseen:   &status.NumUnseen,
 		NumDeleted:  &status.NumDeleted,
-	}, nil
+	}
+
+	return &statusData, nil
 }
 
 func (s *session) Append(mailbox string, r imap.LiteralReader, options *imap.AppendOptions) (*imap.AppendData, error) {
