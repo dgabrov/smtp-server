@@ -5,24 +5,21 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-imap/v2/imapserver"
 )
 
-func StartImap(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, writer io.Writer) {
-	err := start(config, wg, tlsConfig, server, writer)
+func StartImap(config data.ConfigData, tlsConfig *tls.Config, server srv.Servr, writer io.Writer) {
+	err := start(config, tlsConfig, server, writer)
 
 	if err != nil {
 		slog.Error(err.Error())
 	}
 }
 
-func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, server srv.Servr, _ io.Writer) error {
-	defer wg.Done()
-
+func start(config data.ConfigData, tlsConfig *tls.Config, server srv.Servr, _ io.Writer) error {
 	backend := newBackend(tlsConfig, server)
 	// backend.DebugWriter = writer
 

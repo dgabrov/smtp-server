@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
@@ -16,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, tlsConfig *tls.Config, localDomain string, dkimConfig data.DkimConfig, dkimKey *rsa.PrivateKey) {
+func StartQueue(config data.QueueConfig, server srv.Servr, tlsConfig *tls.Config, localDomain string, dkimConfig data.DkimConfig, dkimKey *rsa.PrivateKey) {
 	loaderChannel := make(chan *data.DmQueueRecipient, 1)
 
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -26,8 +25,6 @@ func StartQueue(wg *sync.WaitGroup, config data.QueueConfig, server srv.Servr, t
 	for i := 0; i < config.SimultaneousProcessing; i++ {
 		go processQueue(ctx, server, loaderChannel, tlsConfig, localDomain, dkimConfig, dkimKey)
 	}
-
-	wg.Done()
 }
 
 func startLoader(ctx context.Context, config data.QueueConfig, server srv.Servr, channel chan *data.DmQueueRecipient) {
@@ -51,7 +48,7 @@ func startLoader(ctx context.Context, config data.QueueConfig, server srv.Servr,
 		select {
 		case <-ctx.Done():
 			slog.Info("processing terminated, stopping loader")
-			break
+			return
 		case <-time.After(time.Duration(config.TimeBetweenLoads) * time.Second):
 			slog.Info("load next one")
 		}
@@ -67,6 +64,12 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 			break
 		case item = <-channel:
 			slog.Info(fmt.Sprintf("processing item: %s", item.QueueRecipientID))
+		}
+
+		// if item pointer is null, exit, that means channel is closed
+		if item == nil {
+			slog.Info("exit queue processing after channel closed")
+			break
 		}
 
 		// processing an item

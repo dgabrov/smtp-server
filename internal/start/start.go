@@ -1,6 +1,7 @@
 package start
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -11,7 +12,8 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"sync"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/imp"
@@ -60,14 +62,8 @@ func Start() error {
 		}
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(3) // 25 is open no matter what and the loader is also processing and ultimately imap as well
-	if config.Enabled587 {
-		wg.Add(1) // if enabled 587, add another one as well
-	}
-
 	go func() {
-		err = proceedMainPort(config, &wg, be, tlsConfig, config.ListenAddress)
+		err = proceedMainPort(config, be, tlsConfig, config.ListenAddress)
 
 		if err != nil {
 			slog.Error(fmt.Sprintf("error running main listener: %s", err.Error()))
@@ -76,7 +72,7 @@ func Start() error {
 
 	if config.Enabled587 {
 		go func() {
-			err = proceedMainPort(config, &wg, be, tlsConfig, config.Address587)
+			err = proceedMainPort(config, be, tlsConfig, config.Address587)
 
 			if err != nil {
 				slog.Error(fmt.Sprintf("error running main listener: %s", err.Error()))
@@ -84,12 +80,15 @@ func Start() error {
 		}()
 	}
 
-	go queue.StartQueue(&wg, config.Queue, server, tlsConfig, config.Domain, dkimConfig, key)
+	go queue.StartQueue(config.Queue, server, tlsConfig, config.Domain, dkimConfig, key)
 
 	// start the imap server
-	go imp.StartImap(config, &wg, tlsConfig, server, logWriter)
+	go imp.StartImap(config, tlsConfig, server, logWriter)
 
-	wg.Wait()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	<-ctx.Done()
 
 	return nil
 }
@@ -130,9 +129,7 @@ func getDatabaseConnectionPool(machine string, port int, login string, password 
 	return db, nil
 }
 
-func proceedMainPort(config data.ConfigData, wg *sync.WaitGroup, be smtp.Backend, tlsConfig *tls.Config, listenAddress string) error {
-	defer wg.Done()
-
+func proceedMainPort(config data.ConfigData, be smtp.Backend, tlsConfig *tls.Config, listenAddress string) error {
 	// 2. Initialize the Server
 	s := smtp.NewServer(be)
 	defer s.Close()
