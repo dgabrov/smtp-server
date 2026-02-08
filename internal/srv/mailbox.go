@@ -281,7 +281,7 @@ func (s *server) GetMessageCount(ctx context.Context, mailboxID string) (uint32,
 
 func (s *server) GetChildMailboxes(ctx context.Context, userID string, mailboxID string) ([]*data.DmMailbox, error) {
 	// first load the first one
-	mbox, err := s.GetMailboxByName(ctx, userID, mailboxID)
+	mbox, err := s.GetMailboxByID(ctx, userID, mailboxID)
 	if err != nil {
 		return nil, err
 	}
@@ -323,11 +323,13 @@ func (s *server) GetMailboxesNameStartWith(ctx context.Context, userID string, m
 			  and mailbox_id != ?
 			  and name like ?`
 
-	rs, err := tx.QueryContext(ctx, qr, userID, mailboxID, startWith)
+	rs, err := tx.QueryContext(ctx, qr, userID, mailboxID, startWith+"%")
 	if err != nil {
 		return nil, err
 	}
+
 	defer rs.Close()
+
 	var res []*data.DmMailbox
 
 	for rs.Next() {
@@ -411,4 +413,10 @@ func (s *server) ListMailboxes(ctx context.Context, userID string) ([]*data.DmMa
 	}
 
 	return res, nil
+}
+
+func (s *server) DeleteMailbox(ctx context.Context, userID string, mailboxID string) error {
+	_, err := s.db.ExecContext(ctx, "delete from mailbox where mailbox_id = ? and user_id = ?", mailboxID, userID)
+
+	return err
 }

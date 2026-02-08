@@ -122,7 +122,7 @@ func (s *session) Create(mailbox string, options *imap.CreateOptions) error {
 	if nr > 1 { // if there are parent mailboxes
 		nr = nr - 1
 
-		for i := 0; i < nr; i++ {
+		for i := 1; i < nr; i++ {
 			slc := items[0:i]
 
 			parentName := strings.Join(slc, data.MailboxSeparator)
@@ -162,7 +162,7 @@ func (s *session) Delete(mailbox string) error {
 		return errors.New("cannot delete mailbox because it has child mailboxes")
 	}
 
-	return nil
+	return s.srvr.DeleteMailbox(s.ctx, s.userID, mbox.MailboxID)
 }
 
 func (s *session) Rename(mailbox, newName string, options *imap.RenameOptions) error {
@@ -174,6 +174,15 @@ func (s *session) Rename(mailbox, newName string, options *imap.RenameOptions) e
 
 	if mbox == nil {
 		return fmt.Errorf("mailbox not found: %s", mailbox)
+	}
+
+	destMailbox, err := serv.GetMailboxByName(s.ctx, s.userID, newName)
+	if err != nil {
+		return err
+	}
+
+	if destMailbox != nil {
+		return fmt.Errorf("mailbox already exists: %s", newName)
 	}
 
 	// gather the child mailboxes, they need to have name modified as well
@@ -296,6 +305,7 @@ func (s *session) Poll(w *imapserver.UpdateWriter, allowExpunge bool) error {
 		}
 
 		if count != s.lastMessageCount {
+			slog.Info(fmt.Sprintf("Polling message count: %d changed from %d", count, s.lastMessageCount))
 			err = w.WriteNumMessages(count)
 
 			if err != nil {

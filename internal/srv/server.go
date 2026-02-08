@@ -47,6 +47,8 @@ type Servr interface {
 	GetStrippedMessages(ctx context.Context, numset imap.NumSet, mailboxID string) ([]*data.DmStrippedMessage, error)
 	SearchMessages(ctx context.Context, mailboxID string, search string) ([]uint32, []imap.UID, error)
 	MarkMessageAsSeen(ctx context.Context, messageID string) error
+	GetMailboxByID(ctx context.Context, userID string, mailboxID string) (*data.DmMailbox, error)
+	DeleteMailbox(ctx context.Context, userID string, mailboxID string) error
 }
 
 func NewServer(db *sql.DB) Servr {
@@ -449,6 +451,38 @@ func (s *server) Authenticate(context context.Context, username string, password
 	}
 
 	return tx.Commit()
+}
+
+func (s *server) GetMailboxByID(ctx context.Context, userID string, mailboxID string) (*data.DmMailbox, error) {
+	qr := `select 
+			   mailbox_id,
+			   user_id,
+			   name,
+			   flag_non_existent,
+			   flag_no_inferiors,
+			   flag_no_select,
+			   flag_marked,
+			   flag_archive,
+			   flag_drafts,
+			   flag_flagged,
+			   flag_junk,
+			   flag_sent,
+			   flag_trash,
+			   flag_important
+		from mailbox where user_id = ? and mailbox_id = ?`
+
+	rs, err := s.db.QueryContext(ctx, qr, userID, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rs.Close()
+
+	if rs.Next() {
+		return loadMailbox(rs)
+	} else {
+		return nil, fmt.Errorf("mailbox id: %s not found", mailboxID)
+	}
 }
 
 func getLoginAndDomain(email string) (string, string, error) {
