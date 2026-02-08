@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-imap/v2"
@@ -21,6 +23,8 @@ func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *
 	if err != nil {
 		return err
 	}
+
+	slog.Info(fmt.Sprintf("fetch, mailbox selected: %s, numset: %s, found %d messages", s.selected.MailboxID, numSet.String(), len(messages)))
 
 	for _, msg := range messages {
 		messageID := msg.MessageID

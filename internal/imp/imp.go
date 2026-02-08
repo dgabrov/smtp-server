@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/dgb9/smtp-server/internal/data"
@@ -24,7 +23,6 @@ func start(config data.ConfigData, wg *sync.WaitGroup, tlsConfig *tls.Config, se
 	defer wg.Done()
 
 	backend := newBackend(tlsConfig, server)
-	backend.DebugWriter = os.Stdout
 
 	s := imapserver.New(backend) // 'nil' should be replaced with your backend
 
