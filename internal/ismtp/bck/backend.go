@@ -13,11 +13,16 @@ type backend struct {
 }
 
 func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
+	remoteIP := c.Conn().RemoteAddr().String()
+	helo := c.Hostname()
+
 	return &session{
-		server: b.server,
-		ctx:    context.WithValue(context.Background(), "uuid", uuid.NewString()),
-		conn:   c,
-		to:     make(map[string]bool),
+		server:   b.server,
+		ctx:      context.WithValue(context.Background(), "uuid", uuid.NewString()),
+		conn:     c,
+		to:       make(map[string]bool),
+		remoteIP: remoteIP,
+		helo:     helo,
 	}, nil
 }
 

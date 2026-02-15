@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-smtp"
 	"github.com/google/uuid"
 )
@@ -18,7 +19,7 @@ import (
 func ProcItem(ctx context.Context, from string, to string, message *string, tlsConfig *tls.Config, localDomain string, port int, dkimEnabled bool, dkimSelector string, dkimKey *rsa.PrivateKey) error {
 
 	// get the to address and get the mx values
-	domain, err := getDomain(to)
+	domain, err := srv.GetDomain(to)
 	if err != nil {
 		return err
 	}
@@ -101,13 +102,4 @@ func deliverMail(ctx context.Context, from string, to string, message *string, m
 	}
 
 	return err
-}
-
-func getDomain(addr string) (string, error) {
-	items := strings.Split(addr, "@")
-	if len(items) != 2 {
-		return "", fmt.Errorf("invalid address: %s", addr)
-	}
-
-	return items[1], nil
 }

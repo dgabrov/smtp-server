@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
+	"github.com/mileusna/spf"
 )
 
 type session struct {
@@ -20,6 +22,8 @@ type session struct {
 	ctx           context.Context
 	server        srv.Servr
 	conn          *smtp.Conn
+	remoteIP      string
+	helo          string
 }
 
 func (s *session) AuthMechanisms() []string {
@@ -75,6 +79,20 @@ func (s *session) Mail(from string, _ *smtp.MailOptions) error {
 
 	s.from = from
 	slog.InfoContext(s.ctx, fmt.Sprintf("mail: %s", s.from))
+
+	// now establish the spf if it is good or not
+	ipAddress := net.ParseIP(s.remoteIP)
+	domain, err := srv.GetDomain(from)
+	if err != nil {
+		slog.ErrorContext(s.ctx, fmt.Sprintf("error getting domain: %s", from))
+	} else {
+		res := spf.CheckHost(ipAddress, domain, "", s.helo)
+
+		// now logging the result for spf processing
+		strRes := res.String()
+
+		slog.InfoContext(s.ctx, fmt.Sprintf("checking spf host: %s with ip address: %s, result: %s, helo: %s", domain, s.remoteIP, strRes, s.helo))
+	}
 
 	return nil
 }

@@ -1,6 +1,9 @@
 package srv
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/emersion/go-imap/v2"
 )
@@ -100,4 +103,13 @@ func containsUid(uids *imap.UIDSet, uid imap.UID) bool {
 	}
 
 	return false
+}
+
+func GetDomain(addr string) (string, error) {
+	items := strings.Split(addr, "@")
+	if len(items) != 2 {
+		return "", fmt.Errorf("invalid address: %s", addr)
+	}
+
+	return items[1], nil
 }
