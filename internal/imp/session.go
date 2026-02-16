@@ -3,6 +3,7 @@ package imp
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -266,6 +267,13 @@ func (s *session) Status(mailbox string, options *imap.StatusOptions) (*imap.Sta
 	status, err := servr.GetMailboxStatus(s.ctx, mailboxID)
 	if err != nil {
 		return nil, err
+	}
+
+	js, err := json.Marshal(status)
+	if err != nil {
+		slog.ErrorContext(s.ctx, "cannot marshal mailbox status")
+	} else {
+		slog.InfoContext(s.ctx, fmt.Sprintf("mailbox status: %s", js))
 	}
 
 	statusData := imap.StatusData{
