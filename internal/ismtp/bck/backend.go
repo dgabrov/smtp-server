@@ -2,6 +2,7 @@ package bck
 
 import (
 	"context"
+	"strings"
 
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-smtp"
@@ -14,6 +15,13 @@ type backend struct {
 
 func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 	remoteIP := c.Conn().RemoteAddr().String()
+
+	// if the index of : is
+	index := strings.Index(remoteIP, ":")
+	if index >= 0 {
+		remoteIP = remoteIP[:index]
+	}
+
 	helo := c.Hostname()
 
 	return &session{
