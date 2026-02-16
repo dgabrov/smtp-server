@@ -7,8 +7,10 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 
 	"github.com/dgb9/smtp-server/internal/srv"
+	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/mileusna/spf"
@@ -147,6 +149,10 @@ func (s *session) Data(r io.Reader) error {
 
 	for email, local := range s.to {
 		if local {
+			// check if dkim is ok, if not, no issue, but at least write it down
+
+			s.processDkimInbound(bytes)
+
 			err = s.server.DeliverLocally(s.ctx, email, bytes)
 
 			if err != nil {
@@ -158,7 +164,32 @@ func (s *session) Data(r io.Reader) error {
 	}
 
 	// if the relay is larger than zero, then we address this
-	s.server.DeliverQueue(s.ctx, s.from, relay, bytes)
+	return s.server.DeliverQueue(s.ctx, s.from, relay, bytes)
+}
 
-	return err
+func (s *session) processDkimInbound(bytes []byte) {
+	if s.authenticated {
+		slog.InfoContext(s.ctx, "dkim inbound we do not check dkim because this is authenticated session")
+	} else {
+		strMessage := string(bytes)
+		messageReader := strings.NewReader(strMessage)
+		verifications, err := dkim.Verify(messageReader)
+		if err != nil {
+			slog.ErrorContext(s.ctx, fmt.Sprintf("dkim inbound verification error: %s", err.Error()))
+		} else {
+			if len(verifications) == 0 {
+				slog.InfoContext(s.ctx, "dkim inbound there is no dkim signature attached")
+			}
+
+			for _, verification := range verifications {
+
+				if verification.Err == nil {
+					slog.InfoContext(s.ctx, fmt.Sprintf("dkim inbound VALID: Signature for domain %s passed.", verification.Domain))
+				} else {
+					slog.ErrorContext(s.ctx, fmt.Sprintf("dkim inbound INVALID: Domain %s failed with error: %v", verification.Domain, verification.Err.Error()))
+				}
+			}
+		}
+
+	}
 }
