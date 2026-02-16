@@ -44,7 +44,7 @@ func Start() error {
 	}
 
 	server := srv.NewServer(db)
-	be := bck.NewBackend(server)
+	be := bck.NewBackend(server, config.Spam)
 
 	tlsConfig, err := loadCertificates(config)
 	if err != nil {

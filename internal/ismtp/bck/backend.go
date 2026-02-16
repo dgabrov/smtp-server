@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-smtp"
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 type backend struct {
 	server srv.Servr
+	spam   data.Spam
 }
 
 func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
@@ -31,9 +33,13 @@ func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 		to:       make(map[string]bool),
 		remoteIP: remoteIP,
 		helo:     helo,
+		spam:     b.spam,
 	}, nil
 }
 
-func NewBackend(servr srv.Servr) smtp.Backend {
-	return &backend{server: servr}
+func NewBackend(servr srv.Servr, spam data.Spam) smtp.Backend {
+	return &backend{
+		server: servr,
+		spam:   spam,
+	}
 }

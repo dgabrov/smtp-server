@@ -20,7 +20,7 @@ type Servr interface {
 	GetLoginAndDomain(context context.Context, email string) (string, string, error)
 	IsLocalDomain(context context.Context, domain string) (bool, error)
 	CheckLocalUserAndDomain(context context.Context, login string, domain string) error
-	DeliverLocally(context context.Context, to string, body []byte) error
+	DeliverLocally(context context.Context, to string, body []byte, moveToJunk bool, score float64) error
 	DeliverQueue(context context.Context, from string, to []string, bytes []byte) error
 	MarkQueueItemSuccess(context context.Context, queueItemID string) error
 	AddQueueItemError(ctx context.Context, queueItemID string) error
@@ -220,7 +220,7 @@ func getNrAttempts(ctx context.Context, tx *sql.Tx, id string) (int, error) {
 	return nr, nil
 }
 
-func (s *server) DeliverLocally(context context.Context, to string, body []byte) error {
+func (s *server) DeliverLocally(context context.Context, to string, body []byte, moveToJunk bool, spamScore float64) error {
 	tx := getTx(context, s.db)
 	defer tx.Rollback()
 
@@ -239,6 +239,16 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte)
 		return err
 	}
 
+	if moveToJunk {
+		// look for junk
+		junkMailboxID, err := getJunkMailboxID(context, tx, userID)
+		if err != nil {
+			slog.ErrorContext(context, fmt.Sprintf("cannot find junk mailbox for userID %s", userID))
+		} else {
+			mailboxID = junkMailboxID
+		}
+	}
+
 	if len(mailboxID) == 0 {
 		return errors.New("mailbox not found")
 	}
@@ -250,8 +260,8 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte)
 
 	messageID := uuid.NewString()
 
-	qr := "insert into message (message_id, mailbox_id, body, uid, created_date) values (?, ?, ?, ?, ?)"
-	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body, uid, time.Now().UTC())
+	qr := "insert into message (message_id, mailbox_id, body, uid, created_date, spam_score) values (?, ?, ?, ?, ?, ?)"
+	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body, uid, time.Now().UTC(), spamScore)
 	if err != nil {
 		return err
 	}
@@ -497,6 +507,27 @@ func getLoginAndDomain(email string) (string, string, error) {
 
 func getMailboxID(ctx context.Context, tx *sql.Tx, userID string) (string, error) {
 	qr := "select mailbox_id from mailbox where name = 'INBOX' && user_id = ?"
+	rs, err := tx.QueryContext(ctx, qr, userID)
+	if err != nil {
+		return "", err
+	}
+
+	defer rs.Close()
+
+	mailboxID := ""
+
+	if rs.Next() {
+		err = rs.Scan(&mailboxID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return mailboxID, nil
+}
+
+func getJunkMailboxID(ctx context.Context, tx *sql.Tx, userID string) (string, error) {
+	qr := "select mailbox_id from mailbox where flag_junk = 'Y' && user_id = ?"
 	rs, err := tx.QueryContext(ctx, qr, userID)
 	if err != nil {
 		return "", err

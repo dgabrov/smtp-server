@@ -37,6 +37,12 @@
     "timeBetweenAttempts": 100,
     "simultaneousProcessing": 2
   },
-  "imapAddress": "0.0.0.0:8993"
+  "imapAddress": "0.0.0.0:8993",
+  "spam": {
+    "enabled": true,
+    "copy": true,
+    "address": "localhost:783",
+    "threshold": 5.0
+  }
 
 }

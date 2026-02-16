@@ -1,6 +1,7 @@
 package bck
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,7 +9,10 @@ import (
 	"log/slog"
 	"net"
 	"strings"
+	"time"
 
+	"github.com/Teamwork/spamc"
+	"github.com/dgb9/smtp-server/internal/data"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-sasl"
@@ -26,6 +30,7 @@ type session struct {
 	conn          *smtp.Conn
 	remoteIP      string
 	helo          string
+	spam          data.Spam
 }
 
 func (s *session) AuthMechanisms() []string {
@@ -153,7 +158,9 @@ func (s *session) Data(r io.Reader) error {
 
 			s.processDkimInbound(bytes)
 
-			err = s.server.DeliverLocally(s.ctx, email, bytes)
+			move, score := s.processSpam(bytes)
+
+			err = s.server.DeliverLocally(s.ctx, email, bytes, move, score)
 
 			if err != nil {
 				slog.ErrorContext(s.ctx, fmt.Sprintf("error delivering locally delivery locally email: %s, error: %s", email, err.Error()))
@@ -192,4 +199,33 @@ func (s *session) processDkimInbound(bytes []byte) {
 		}
 
 	}
+}
+
+func (s *session) processSpam(msg []byte) (bool, float64) {
+	move := false
+	score := 0.0
+
+	spamConfig := s.spam
+
+	if !spamConfig.Enabled || s.authenticated {
+		// either not enabled or authenticated
+		return move, score
+	}
+
+	client := spamc.New(spamConfig.Address, &net.Dialer{Timeout: 5 * time.Second})
+	result, err := client.Check(s.ctx, bytes.NewReader(msg), nil)
+
+	if err != nil {
+		slog.ErrorContext(s.ctx, fmt.Sprintf("error checking spam result: %s", err.Error()))
+	} else {
+		score = result.ResponseScore.Score
+
+		slog.Info(fmt.Sprintf("message spam score: %5.2f", score))
+
+		if score > spamConfig.Threshold && spamConfig.Copy {
+			move = true
+		}
+	}
+
+	return move, score
 }

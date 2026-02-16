@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+type Spam struct {
+	Enabled   bool
+	Copy      bool
+	Address   string
+	Threshold float64
+}
 type DkimConfig struct {
 	Enabled    bool
 	PrivateKey string
@@ -53,6 +59,7 @@ type ConfigData struct {
 
 	Queue       QueueConfig
 	ImapAddress string
+	Spam        Spam
 }
 
 func LoadConfig() (ConfigData, error) {
@@ -111,4 +118,10 @@ func LogConfig(config ConfigData) {
 	slog.Info(fmt.Sprintf("dkim enabled: %t", dkimConfig.Enabled))
 	slog.Info(fmt.Sprintf("dkim private key: %s", dkimConfig.PrivateKey))
 	slog.Info(fmt.Sprintf("dkim selector: %s", dkimConfig.Selector))
+
+	spam := config.Spam
+	slog.Info(fmt.Sprintf("spam enabled: %t", spam.Enabled))
+	slog.Info(fmt.Sprintf("spam address: %s", spam.Address))
+	slog.Info(fmt.Sprintf("spam threshold: %5.2f", spam.Threshold))
+	slog.Info(fmt.Sprintf("spam copy: %t", spam.Copy))
 }

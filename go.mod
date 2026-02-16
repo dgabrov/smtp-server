@@ -14,9 +14,12 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/Teamwork/spamc v0.0.0-20200109085853-a4e0c5c3f7a0 // indirect
 	github.com/emersion/go-message v0.18.1 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mileusna/spf v0.9.5 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/teamwork/utils v1.0.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
