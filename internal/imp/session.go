@@ -30,16 +30,19 @@ type session struct {
 }
 
 func newImapSession(server srv.Servr) imapserver.Session {
+	id := uuid.NewString()
+	ctx := context.WithValue(context.Background(), "transaction-id", id)
+
 	return &session{
-		id:          uuid.NewString(),
+		id:          id,
 		srvr:        server,
-		ctx:         context.Background(),
+		ctx:         ctx,
 		uidValidity: data.UIDValidity, // will not change; this is for mailboxes, and only change when you destroy the database
 	}
 }
 
 func (s *session) Close() error {
-	slog.Info(fmt.Sprintf("Closing session: %s", s.id))
+	slog.InfoContext(s.ctx, fmt.Sprintf("Closing session: %s", s.id))
 
 	return nil
 }
@@ -151,7 +154,7 @@ func (s *session) Delete(mailbox string) error {
 	}
 
 	if mbox == nil {
-		slog.Info(fmt.Sprintf("mailbox not found: %s, so nothing to delete here", mailbox))
+		slog.InfoContext(s.ctx, fmt.Sprintf("mailbox not found: %s, so nothing to delete here", mailbox))
 		return nil
 	}
 
@@ -214,13 +217,13 @@ func (s *session) Rename(mailbox, newName string, options *imap.RenameOptions) e
 }
 
 func (s *session) Subscribe(mailbox string) error {
-	slog.Info(fmt.Sprintf("Subscribing to %s", mailbox))
+	slog.InfoContext(s.ctx, fmt.Sprintf("Subscribing to %s", mailbox))
 
 	return nil
 }
 
 func (s *session) Unsubscribe(mailbox string) error {
-	slog.Info(fmt.Sprintf("Unsubscribing from %s", mailbox))
+	slog.InfoContext(s.ctx, fmt.Sprintf("Unsubscribing from %s", mailbox))
 
 	return nil
 }
@@ -309,7 +312,7 @@ func (s *session) Poll(w *imapserver.UpdateWriter, allowExpunge bool) error {
 		}
 
 		if count != s.lastMessageCount {
-			slog.Info(fmt.Sprintf("Polling message count: %d changed from %d", count, s.lastMessageCount))
+			slog.InfoContext(s.ctx, fmt.Sprintf("Polling message count: %d changed from %d", count, s.lastMessageCount))
 			err = w.WriteNumMessages(count)
 
 			if err != nil {
@@ -356,7 +359,7 @@ func (s *session) Unselect() error {
 
 func (s *session) Expunge(w *imapserver.ExpungeWriter, uids *imap.UIDSet) error {
 	if s.selected == nil {
-		slog.Info("no mailbox selected, we cannot expunge")
+		slog.InfoContext(s.ctx, "no mailbox selected, we cannot expunge")
 
 		return nil
 	}

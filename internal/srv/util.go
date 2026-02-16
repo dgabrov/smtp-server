@@ -1,6 +1,7 @@
 package srv
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -112,4 +113,8 @@ func GetDomain(addr string) (string, error) {
 	}
 
 	return items[1], nil
+}
+
+func rollback(tx *sql.Tx) {
+	_ = tx.Rollback()
 }

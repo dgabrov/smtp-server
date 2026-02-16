@@ -19,7 +19,7 @@ func (s *server) GetExpungeInformation(ctx context.Context, uids *imap.UIDSet, m
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	qr := `select row_number() over (order by created_date, uid) row_nr, message_id, uid
 			  from message
@@ -60,7 +60,7 @@ func (s *server) DeleteMessage(ctx context.Context, mailboxID string, messageID 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	_, err = tx.ExecContext(ctx, "delete from message where mailbox_id = ? and message_id = ?", mailboxID, messageID)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *server) AppendMessage(ctx context.Context, mailboxID string, body []byt
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	uid, err := getNextUid(ctx, tx, mailboxID)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *server) GetFilteredPositionalData(ctx context.Context, mailboxID string
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	var res []*data.DmPositionalMessage
 
@@ -252,7 +252,7 @@ func (s *server) GetStrippedMessages(ctx context.Context, nset imap.NumSet, mail
 
 	// go through them
 	for _, id := range strIds {
-		item, ok := resultMap[id]
+		item := resultMap[id]
 
 		pos, ok := posMap[id]
 		if ok {
@@ -305,7 +305,7 @@ func (s *server) SearchMessages(ctx context.Context, mailboxID string, search st
 }
 
 func (s *server) MarkMessageAsSeen(ctx context.Context, messageID string) error {
-	slog.Info(fmt.Sprintf("marking message as seen: %s", messageID))
+	slog.InfoContext(ctx, fmt.Sprintf("marking message as seen: %s", messageID))
 
 	qr := `UPDATE message SET flag_seen = 'Y' WHERE message_id = ?`
 	_, err := s.db.ExecContext(ctx, qr, messageID)

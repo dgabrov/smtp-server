@@ -15,7 +15,7 @@ func (s *server) CopyMessages(ctx context.Context, set imap.NumSet, sourceMailbo
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	var res imap.CopyData
 

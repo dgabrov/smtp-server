@@ -15,7 +15,7 @@ func (s *server) GetMailboxByName(ctx context.Context, userId string, name strin
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 	var res *data.DmMailbox
 
 	qr := `select 
@@ -113,7 +113,7 @@ func (s *server) GetMailboxStatus(ctx context.Context, mailboxID string) (*data.
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	numMessages, err := getCountMessages(ctx, tx, mailboxID)
 	if err != nil {
@@ -265,7 +265,7 @@ func (s *server) GetMessageCount(ctx context.Context, mailboxID string) (uint32,
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 	number, err := getCountMessages(ctx, tx, mailboxID)
 	if err != nil {
 		return 0, err
@@ -301,7 +301,7 @@ func (s *server) GetMailboxesNameStartWith(ctx context.Context, userID string, m
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	qr := `select mailbox_id,
 				   mailbox_id,
@@ -354,10 +354,14 @@ func (s *server) CreateMailbox(ctx context.Context, userID string, newMailboxID 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	qr := "insert into mailbox (mailbox_id, user_id, name) values (?, ?, ?)"
 	_, err = tx.ExecContext(ctx, qr, newMailboxID, userID, mailbox)
+
+	if err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -367,7 +371,7 @@ func (s *server) UpdateMailboxName(ctx context.Context, userID string, mailboxID
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	_, err = tx.ExecContext(ctx, "update mailbox set name = ? where mailbox_id = ? and user_id = ?", name, mailboxID, userID)
 	if err != nil {

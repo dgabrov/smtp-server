@@ -28,7 +28,7 @@ func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 
 	return &session{
 		server:   b.server,
-		ctx:      context.WithValue(context.Background(), "uuid", uuid.NewString()),
+		ctx:      context.WithValue(context.Background(), "transaction-id", uuid.NewString()),
 		conn:     c,
 		to:       make(map[string]bool),
 		remoteIP: remoteIP,

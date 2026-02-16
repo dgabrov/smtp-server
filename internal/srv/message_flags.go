@@ -14,7 +14,7 @@ func (s *server) SetMessageFlags(ctx context.Context, messageID string, flags []
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	err = setMessageFlags(ctx, tx, messageID, flags)
 	if err != nil {
@@ -34,7 +34,7 @@ func (s *server) DeleteMessageFlags(ctx context.Context, messageID string, flags
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	currentFlags, err := getCurrentMessageFlags(ctx, tx, messageID)
 	if err != nil {
@@ -49,6 +49,9 @@ func (s *server) DeleteMessageFlags(ctx context.Context, messageID string, flags
 	}
 
 	err = setMessageFlags(ctx, tx, messageID, newFlags)
+	if err != nil {
+		return nil, err
+	}
 
 	err = tx.Commit()
 	if err != nil {
@@ -63,7 +66,7 @@ func (s *server) AddMessageFlags(ctx context.Context, messageID string, flags []
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	currentFlags, err := getCurrentMessageFlags(ctx, tx, messageID)
 	if err != nil {
@@ -77,6 +80,9 @@ func (s *server) AddMessageFlags(ctx context.Context, messageID string, flags []
 	}
 
 	err = setMessageFlags(ctx, tx, messageID, currentFlags)
+	if err != nil {
+		return nil, err
+	}
 
 	err = tx.Commit()
 	if err != nil {

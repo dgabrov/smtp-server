@@ -64,7 +64,7 @@ func (s *server) GetUserID(ctx context.Context, email string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	login, domain, err := getLoginAndDomain(email)
 	if err != nil {
@@ -111,6 +111,9 @@ func (s *server) LoadQueueRecipients(ctx context.Context, config data.QueueConfi
 		var lastAttemptedDt sql.NullTime
 
 		err = rs.Scan(&item.QueueRecipientID, &item.QueueID, &item.ToAddr, &item.Attempts, &lastAttemptedDt, &s)
+		if err != nil {
+			return nil, err
+		}
 
 		item.Success = strings.ToUpper(s) == "Y"
 		item.LastAttemptedDt = lastAttemptedDt.Time
@@ -170,7 +173,7 @@ func (s *server) AddQueueItemError(ctx context.Context, queueItemID string) erro
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	nrAttempts, err := getNrAttempts(ctx, tx, queueItemID)
 	if err != nil {
@@ -222,7 +225,7 @@ func getNrAttempts(ctx context.Context, tx *sql.Tx, id string) (int, error) {
 
 func (s *server) DeliverLocally(context context.Context, to string, body []byte, moveToJunk bool, spamScore float64) error {
 	tx := getTx(context, s.db)
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	login, domain, err := getLoginAndDomain(to)
 	if err != nil {
@@ -230,6 +233,10 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte,
 	}
 
 	userID, err := getUserID(context, tx, login, domain)
+	if err != nil {
+		return err
+	}
+
 	if len(userID) == 0 {
 		return errors.New("user not found")
 	}
@@ -276,7 +283,7 @@ func (s *server) DeliverQueue(context context.Context, from string, to []string,
 	}
 
 	tx := getTx(context, s.db)
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	qr := "insert into queue (queue_id, from_addr, body) values (?, ?, ?)"
 	id := uuid.NewString()
@@ -302,7 +309,7 @@ func (s *server) DeliverQueue(context context.Context, from string, to []string,
 
 func (s *server) CheckLocalUserAndDomain(context context.Context, login string, domain string) error {
 	tx := getTx(context, s.db)
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	userID, err := getUserID(context, tx, login, domain)
 	if err != nil {
@@ -410,7 +417,7 @@ func getDestinationUser(ctx context.Context, tx *sql.Tx, domainID string, user s
 
 func (s *server) IsLocalDomain(context context.Context, domain string) (bool, error) {
 	tx := getTx(context, s.db)
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	dmDomain, err := getDomainByName(context, tx, domain)
 	if err != nil {
@@ -431,7 +438,7 @@ func (s *server) GetLoginAndDomain(context context.Context, email string) (strin
 func (s *server) Authenticate(context context.Context, username string, password string) error {
 	hashed := hashPassword(password)
 	tx := getTx(context, s.db)
-	defer tx.Rollback()
+	defer rollback(tx)
 
 	login, domain, err := getLoginAndDomain(username)
 	if err != nil {

@@ -24,7 +24,7 @@ func (s *session) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *
 		return err
 	}
 
-	slog.Info(fmt.Sprintf("fetch, mailbox selected: %s, numset: %s, found %d messages", s.selected.MailboxID, numSet.String(), len(messages)))
+	slog.InfoContext(s.ctx, fmt.Sprintf("fetch, mailbox selected: %s, numset: %s, found %d messages", s.selected.MailboxID, numSet.String(), len(messages)))
 
 	for _, msg := range messages {
 		messageID := msg.MessageID

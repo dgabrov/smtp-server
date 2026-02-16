@@ -115,6 +115,10 @@ func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 	}
 
 	local, err := s.server.IsLocalDomain(s.ctx, domain)
+	if err != nil {
+		return err
+	}
+
 	slog.InfoContext(s.ctx, fmt.Sprintf("local: %t", local))
 
 	if local {
@@ -220,7 +224,7 @@ func (s *session) processSpam(msg []byte) (bool, float64) {
 	} else {
 		score = result.ResponseScore.Score
 
-		slog.Info(fmt.Sprintf("message spam score: %5.2f", score))
+		slog.InfoContext(s.ctx, fmt.Sprintf("message spam score: %5.2f", score))
 
 		if score > spamConfig.Threshold && spamConfig.Copy {
 			move = true

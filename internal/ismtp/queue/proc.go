@@ -42,9 +42,7 @@ func ProcItem(ctx context.Context, from string, to string, message *string, tlsC
 
 	for _, mxAddress := range mxAddresses {
 		host := mxAddress.Host
-		if strings.HasSuffix(host, ".") {
-			host = host[:len(host)-1]
-		}
+		host = strings.TrimSuffix(host, ".")
 
 		deliveryAddress := fmt.Sprintf("%s:%d", host, port)
 		id := uuid.NewString()
