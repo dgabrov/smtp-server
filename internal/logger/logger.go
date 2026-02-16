@@ -1,4 +1,4 @@
-package start
+package logger
 
 import (
 	"context"
@@ -10,7 +10,9 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-const uuidKey = "transaction-id"
+type contextKey int
+
+const uuidKey contextKey = iota
 
 type ContextHandler struct {
 	slog.Handler
@@ -20,12 +22,16 @@ func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	// Check if the UUID exists in the context
 	if v, ok := ctx.Value(uuidKey).(string); ok {
 		// Add the attribute to the record before passing it down
-		r.AddAttrs(slog.String(uuidKey, v))
+		r.AddAttrs(slog.String("uuid", v))
 	}
 	return h.Handler.Handle(ctx, r)
 }
 
-func configureLogger(c data.ConfigData) io.Writer {
+func GetLogContext(uuid string) context.Context {
+	return context.WithValue(context.Background(), uuidKey, uuid)
+}
+
+func ConfigureLogger(c data.ConfigData) io.Writer {
 	logConfig := c.Log
 
 	lumberjackLogger := &lumberjack.Logger{

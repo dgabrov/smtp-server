@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
+	"github.com/dgb9/smtp-server/internal/logger"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/google/uuid"
 )
@@ -91,7 +92,8 @@ func processQueue(ctx context.Context, server srv.Servr, channel chan *data.DmQu
 }
 
 func processMailQueueItem(queue *data.DmQueue, item *data.DmQueueRecipient, tlsConfig *tls.Config, localDomain string, config data.DkimConfig, dkimKey *rsa.PrivateKey) error {
-	ctx := context.WithValue(context.Background(), "transaction-id", uuid.NewString())
+	newID := uuid.NewString()
+	ctx := logger.GetLogContext(newID)
 
 	return ProcItem(ctx, queue.From, item.ToAddr, &queue.Body, tlsConfig, localDomain, 25, config.Enabled, config.Selector, dkimKey)
 }

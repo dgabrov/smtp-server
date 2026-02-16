@@ -19,6 +19,7 @@ import (
 	"github.com/dgb9/smtp-server/internal/imp"
 	"github.com/dgb9/smtp-server/internal/ismtp/bck"
 	"github.com/dgb9/smtp-server/internal/ismtp/queue"
+	"github.com/dgb9/smtp-server/internal/logger"
 	"github.com/dgb9/smtp-server/internal/srv"
 	_ "github.com/go-sql-driver/mysql"
 
@@ -33,7 +34,7 @@ func Start() error {
 		return err
 	}
 
-	logWriter := configureLogger(config)
+	logWriter := logger.ConfigureLogger(config)
 
 	data.LogConfig(config)
 

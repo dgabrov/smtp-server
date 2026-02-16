@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dgb9/smtp-server/internal/data"
+	"github.com/dgb9/smtp-server/internal/logger"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
@@ -31,7 +32,7 @@ type session struct {
 
 func newImapSession(server srv.Servr) imapserver.Session {
 	id := uuid.NewString()
-	ctx := context.WithValue(context.Background(), "transaction-id", id)
+	ctx := logger.GetLogContext(id)
 
 	return &session{
 		id:          id,

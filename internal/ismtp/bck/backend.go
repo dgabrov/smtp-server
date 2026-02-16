@@ -1,10 +1,10 @@
 package bck
 
 import (
-	"context"
 	"strings"
 
 	"github.com/dgb9/smtp-server/internal/data"
+	"github.com/dgb9/smtp-server/internal/logger"
 	"github.com/dgb9/smtp-server/internal/srv"
 	"github.com/emersion/go-smtp"
 	"github.com/google/uuid"
@@ -26,9 +26,12 @@ func (b *backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
 
 	helo := c.Hostname()
 
+	newID := uuid.NewString()
+	ctx := logger.GetLogContext(newID)
+
 	return &session{
 		server:   b.server,
-		ctx:      context.WithValue(context.Background(), "transaction-id", uuid.NewString()),
+		ctx:      ctx,
 		conn:     c,
 		to:       make(map[string]bool),
 		remoteIP: remoteIP,
