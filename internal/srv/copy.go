@@ -60,13 +60,15 @@ func (s *server) CopyMessages(ctx context.Context, set imap.NumSet, sourceMailbo
 func copyMail(ctx context.Context, tx *sql.Tx, originalMessageID string, newUID uint32, destinationMailboxID string) error {
 	newMessageID := uuid.NewString()
 
-	qr := `insert into message 
-				(message_id, mailbox_id, body, uid, created_date, flag_seen, flag_answered, 
-				 flag_flagged, flag_deleted, flag_draft) 
-			select ?, ?, body, ?, created_date, flag_seen, 
-				   flag_answered, flag_flagged, flag_deleted, flag_draft 
-			from 
-				message 
+	qr := `insert into message
+				(message_id, mailbox_id, body, uid, created_date, flag_seen, flag_answered,
+				 flag_flagged, flag_deleted, flag_draft, message_date, subject, message_from,
+				 sender, reply_to, message_to, cc, bcc, in_reply_to)
+			select ?, ?, body, ?, created_date, flag_seen,
+				   flag_answered, flag_flagged, flag_deleted, flag_draft, message_date, subject,
+				   message_from, sender, reply_to, message_to, cc, bcc, in_reply_to
+			from
+				message
 			where message_id = ?`
 	_, err := tx.ExecContext(ctx, qr, newMessageID, destinationMailboxID, newUID, originalMessageID)
 

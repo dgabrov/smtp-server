@@ -6,8 +6,8 @@
   "maxMessageBytes": 104857600,
   "allowInsecureAuth": false,
   "certificates": {
-    "public": "/home/daniel/IdeaProjects/smtp-server/docs/cert.pem",
-    "private": "/home/daniel/IdeaProjects/smtp-server/docs/key.pem"
+    "public": "C:\\Users\\dgabr\\work\\smtp-server\\docs\\cert.pem",
+    "private": "C:\\Users\\dgabr\\work\\smtp-server\\docs\\key.pem"
   },
   "enabled587": true,
   "address587": "0.0.0.0:8587",
@@ -20,11 +20,11 @@
   },
   "dkim":{
     "enabled": true,
-    "privateKey": "/home/daniel/IdeaProjects/smtp-server/docs/dkim_private.pem",
+    "privateKey": "C:\\Users\\dgabr\\work\\smtp-server\\docs\\dkim_private.pem",
     "selector": "default"
   },
   "log": {
-    "fileName": "/home/daniel/IdeaProjects/smtp-server/logs/smtp.log",
+    "fileName": "C:\\Users\\dgabr\\work\\smtp-server\\docs\\logs\\smtp.log",
     "maxSize": 100,
     "maxBackups": 30,
     "maxAge": 365,
@@ -39,7 +39,7 @@
   },
   "imapAddress": "0.0.0.0:8993",
   "spam": {
-    "enabled": true,
+    "enabled": false,
     "copy": true,
     "address": "localhost:783",
     "threshold": 5.0

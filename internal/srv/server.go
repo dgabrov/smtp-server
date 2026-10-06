@@ -45,7 +45,7 @@ type Servr interface {
 	CopyMessages(ctx context.Context, set imap.NumSet, sourceMailboxID string, destinationMailboxID string) (*imap.CopyData, error)
 	GetMessageBody(ctx context.Context, messageID string) ([]byte, error)
 	GetStrippedMessages(ctx context.Context, numset imap.NumSet, mailboxID string) ([]*data.DmStrippedMessage, error)
-	SearchMessages(ctx context.Context, mailboxID string, search string) ([]uint32, []imap.UID, error)
+	SearchMessages(ctx context.Context, mailboxID string, criteria *imap.SearchCriteria) ([]uint32, []imap.UID, error)
 	MarkMessageAsSeen(ctx context.Context, messageID string) error
 	GetMailboxByID(ctx context.Context, userID string, mailboxID string) (*data.DmMailbox, error)
 	DeleteMailbox(ctx context.Context, userID string, mailboxID string) error
@@ -267,8 +267,13 @@ func (s *server) DeliverLocally(context context.Context, to string, body []byte,
 
 	messageID := uuid.NewString()
 
-	qr := "insert into message (message_id, mailbox_id, body, uid, created_date, spam_score) values (?, ?, ?, ?, ?, ?)"
-	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body, uid, time.Now().UTC(), spamScore)
+	subject, from, sender, replyTo, emailTo, cc, bcc, inReplyTo, messageDate, parseErr := parseEmailHeaders(body)
+	if parseErr != nil {
+		slog.WarnContext(context, fmt.Sprintf("failed to parse email headers: %v", parseErr))
+	}
+
+	qr := "insert into message (message_id, mailbox_id, body, uid, created_date, spam_score, message_date, subject, message_from, sender, reply_to, message_to, cc, bcc, in_reply_to) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	_, err = tx.ExecContext(context, qr, messageID, mailboxID, body, uid, time.Now().UTC(), spamScore, messageDate, subject, from, sender, replyTo, emailTo, cc, bcc, inReplyTo)
 	if err != nil {
 		return err
 	}

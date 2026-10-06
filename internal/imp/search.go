@@ -1,8 +1,6 @@
 package imp
 
 import (
-	"strings"
-
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
 )
@@ -10,12 +8,7 @@ import (
 func (s *session) Search(kind imapserver.NumKind, criteria *imap.SearchCriteria, options *imap.SearchOptions) (*imap.SearchData, error) {
 	res := imap.SearchData{}
 
-	search := ""
-	if criteria != nil && len(criteria.Body) > 0 {
-		search = strings.Join(criteria.Body, "%")
-	}
-
-	numSeqs, uids, err := s.srvr.SearchMessages(s.ctx, s.selected.MailboxID, search)
+	numSeqs, uids, err := s.srvr.SearchMessages(s.ctx, s.selected.MailboxID, criteria)
 	if err != nil {
 		return nil, err
 	}
